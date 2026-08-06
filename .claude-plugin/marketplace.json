@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "textbook-to-note-skill",
+  "description": "Textbook chapter PDFs to Notion-style study notes.",
+  "owner": {
+    "name": "Cotidie"
+  },
+  "plugins": [
+    {
+      "name": "textbook-notes",
+      "description": "Distill dense, math-heavy textbook chapter PDFs into Notion-style study notes with KaTeX math and self-contained offline HTML output.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

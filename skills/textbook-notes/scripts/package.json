@@ -1,0 +1,12 @@
+{
+  "name": "textbook-notes-renderer",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "katex": "^0.16.11",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-container": "^4.0.0",
+    "markdown-it-texmath": "^1.0.0"
+  }
+}

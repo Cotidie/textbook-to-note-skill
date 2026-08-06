@@ -1,0 +1,11 @@
+{
+  "name": "textbook-notes",
+  "description": "Distill dense, math-heavy textbook chapter PDFs into Notion-style study notes: callouts, server-rendered KaTeX math, gap-filled derivations, figures and Q&A, emitted as one self-contained offline HTML file per chapter.",
+  "version": "1.0.0",
+  "skills": "./skills/",
+  "author": {
+    "name": "Cotidie"
+  },
+  "homepage": "https://github.com/Cotidie/textbook-to-note-skill",
+  "keywords": ["study-notes", "textbook", "katex", "pdf", "markdown"]
+}
