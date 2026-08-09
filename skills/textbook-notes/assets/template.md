@@ -16,6 +16,11 @@
 <Plain-language framing paragraph: why this section exists. Definitions
 and theorems go here, in the body, with every symbol named.>
 
+::: symbols
+- $<latex>$ : <role in plain words, math allowed; place the block where
+  the book introduces these symbols>
+:::
+
 <Body: short paragraphs, display math for every load-bearing equation.>
 
 ::: gap <What is being derived or verified>

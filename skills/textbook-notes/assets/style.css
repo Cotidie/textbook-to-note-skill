@@ -160,7 +160,7 @@ a.eqref {
   text-underline-offset: 3px;
 }
 a.eqref:hover { color: var(--teal); }
-.eq-preview {
+.hover-preview {
   display: none;
   position: absolute;
   z-index: 10;
@@ -172,16 +172,49 @@ a.eqref:hover { color: var(--teal); }
   max-width: min(680px, 92vw);
   overflow-x: auto;
 }
-.eq-preview .katex-display { margin: 10px 0; }
+.hover-preview .katex-display { margin: 10px 0; }
 .eq-block:target .katex-display {
   background: color-mix(in srgb, var(--ochre) 16%, transparent);
   border-radius: 8px;
 }
 @media print {
   a.eqref { text-decoration: none; }
-  .eq-preview { display: none !important; }
+  .hover-preview { display: none !important; }
 }
 
 /* Inside the hover preview the equation container is max-content wide, so
    the absolutely-positioned \tag would overlap the equation; reserve room. */
-.eq-preview .katex-display > .katex > .katex-html { padding-right: 3.4em; }
+.hover-preview .katex-display > .katex > .katex-html { padding-right: 3.4em; }
+
+/* Symbol definitions: the ::: symbols notation box, and symref links wrapping
+   every inline occurrence of a defined symbol (hover preview, click to jump). */
+.symbols {
+  border-radius: 16px;
+  border-left: 4px solid var(--lavender);
+  background: color-mix(in srgb, var(--lavender) 7%, white);
+  padding: 14px 18px;
+  margin: 16px 0;
+}
+.symbols-title {
+  font-size: 12px; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 8px;
+}
+.symbols ul {
+  list-style: none; margin: 0; padding: 0;
+  column-count: 2; column-gap: 32px;
+}
+.symbols li { margin: 4px 0; break-inside: avoid; }
+.symbols li:target {
+  background: color-mix(in srgb, var(--ochre) 25%, transparent);
+  border-radius: 6px;
+}
+@media (max-width: 640px) { .symbols ul { column-count: 1; } }
+a.symref {
+  color: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--lavender) 65%, var(--muted));
+  text-underline-offset: 3px;
+}
+a.symref:hover { background: color-mix(in srgb, var(--lavender) 18%, transparent); border-radius: 4px; }
+.hover-preview .sym-row { margin: 8px 0; }
+.hover-preview .sym-sep { color: var(--muted); }
+@media print { a.symref { text-decoration: none; } }

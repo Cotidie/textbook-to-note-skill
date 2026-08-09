@@ -106,6 +106,36 @@ The note reads as one continuous story, not a stack of definitions.
   letting them scroll horizontally. Rough limit: if a display equation
   would not fit in about 80 characters of LaTeX terms, split it at an
   operator (=, +) with `\\` and align.
+- Never start the paragraph after a display equation with a parenthesized
+  number: `(6.6)에서 ...`. The renderer swallows it as that equation's
+  number, which silently shifts every following equation anchor. Write
+  `식 (6.6)에서 ...` (or "eq. (6.6)") instead.
+- Math does not render inside `<figure>` blocks or in callout TITLES (the
+  text after `::: gap`): both are emitted as raw text. Captions and callout
+  titles use Unicode symbols (φ₀, σ, √v, Ωᵀ), never `$...$`. Math inside a
+  callout BODY renders normally.
+
+## Symbol glossary
+
+Every chapter whose notation recurs gets `::: symbols` blocks. Each entry
+becomes the hover definition and the click target for every inline
+occurrence of that symbol, so:
+
+- Place each block at the symbols' true first definition: usually right
+  after the passage that introduces them. A section that introduces new
+  symbols gets its own block there; never one big glossary at the top for
+  symbols the reader has not met yet.
+- Entry format: `- $latex$ : role in plain words`. One line, math allowed
+  in the definition, no trailing period.
+- Keys use the book's notation verbatim with its canonical index letter
+  (`p_u(i)`, not `p_u(j)`). Occurrences with shifted or numeric indices
+  (`p_u(i-1)`, `p_2`) match automatically; role subscripts (`u`, `d`,
+  `s`, `b`) are literal, so `e_u` and `e_d` are separate entries.
+- The box supplements, never replaces, the body rule that every symbol
+  gets a plain-words name at first use. Do not turn body definitions into
+  box-only definitions.
+- Korean notes title the block `::: symbols 기호`; the default title is
+  "Notation".
 
 ## Callouts
 

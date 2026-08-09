@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { createRenderer, extractToc, renderToc, inlineImages, rewriteMdLinks, katexCss, page, isMainModule } from './render.mjs'
+import { createRenderer, extractToc, renderToc, inlineImages, rewriteMdLinks, katexCss, page, isMainModule, normalizeSym, collectSymbols, injectSymAnchors, linkifySymbols, previewAssets } from './render.mjs'
 
 test('renders inline and display math with KaTeX', () => {
   const md = createRenderer()
@@ -128,6 +128,128 @@ test('linkifyEqRefs links known tags outside math, skips ::: lines', async () =>
   assert.match(out, /\$\$f\(4\) \\tag\{6\}\$\$/)
   assert.match(out, /::: qa about \(4\)\n/)
   assert.match(out, /body <a class="eqref"/)
+})
+
+test('linkifyEqRefs links dotted tags like (6.10)', async () => {
+  const { linkifyEqRefs } = await import('./render.mjs')
+  const resolve = tag => (tag === '6.10' ? '#eq-6.10' : null)
+  const out = linkifyEqRefs('see (6.10) and (1951)\n', resolve)
+  assert.match(out, /<a class="eqref" data-eq="6.10" href="#eq-6.10">\(6\.10\)<\/a> and \(1951\)/)
+})
+
+test('normalizeSym canonicalizes index arguments, keeps role subscripts', () => {
+  assert.equal(normalizeSym('p_u(i-1)'), 'p_u(#)')
+  assert.equal(normalizeSym('M_1'), 'M_#')
+  assert.equal(normalizeSym('e_d'), 'e_d')
+  assert.equal(normalizeSym('n_{i-1}(t-1)'), 'n_#(#)')
+  assert.equal(normalizeSym('p_{u}'), 'p_u')
+  assert.equal(normalizeSym('\\bar n(i)'), '\\barn(#)')
+  assert.equal(normalizeSym('E(r, p_u, N)'), 'E(r,p_u,N)')
+  assert.equal(normalizeSym('e_{i+1}'), 'e_#')
+})
+
+test('collectSymbols parses entries, nulls bad lines, dedupes ids', () => {
+  const src = [
+    '::: symbols 기호', '',
+    '- $p_i$ : failure probability of $M_i$',
+    '- $L(i)$ : two-machine line around buffer $B_i$',
+    '- not an entry',
+    '- $p_j$ : duplicate norm of p_i',
+    ':::',
+  ].join('\n')
+  const syms = collectSymbols(src)
+  assert.equal(syms.length, 4)
+  assert.deepEqual(syms[0], { key: 'p_i', def: 'failure probability of $M_i$', norm: 'p_#', id: 'sym-p_i' })
+  assert.equal(syms[1].id, 'sym-L-i')
+  assert.equal(syms[2], null)
+  assert.equal(syms[3].norm, 'p_#')
+  assert.notEqual(syms[3].id, syms[0].id)
+})
+
+test('symbols container renders a titled box', () => {
+  const md = createRenderer()
+  const html = md.render('::: symbols\n- $p_i$ : def\n:::\n')
+  assert.match(html, /<div class="symbols"><p class="symbols-title">Notation<\/p>/)
+  const ko = md.render('::: symbols 기호\n- $p_i$ : def\n:::\n')
+  assert.match(ko, /<p class="symbols-title">기호<\/p>/)
+})
+
+test('injectSymAnchors ids list items in order, skips null entries', () => {
+  const html = '<div class="symbols"><ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul></div>'
+  const syms = [{ id: 'sym-a' }, null, { id: 'sym-c' }]
+  const out = injectSymAnchors(html, syms)
+  assert.match(out, /<li id="sym-a">a<\/li>/)
+  assert.match(out, /<li>b<\/li>/)
+  assert.match(out, /<li id="sym-c">c<\/li>/)
+})
+
+test('linkifySymbols wraps matching inline math, resolves comma lists', () => {
+  const md = createRenderer()
+  const lookup = new Map([
+    ['p_#', { id: 'sym-p_i', href: '#sym-p_i' }],
+    ['r_u(#)', { id: 'sym-r_u-i', href: '#sym-r_u-i' }],
+  ])
+  const body = md.render('Fails with $p_2$ per cycle. Pair $p_u(i), r_u(i-1)$ here. No hit: $x^2$.')
+  const { html, used } = linkifySymbols(body, lookup)
+  assert.match(html, /<a class="symref" href="#sym-p_i" data-syms="sym-p_i"><eq>/)
+  assert.match(html, /<a class="symref" href="#sym-r_u-i" data-syms="sym-r_u-i"><eq>/)
+  assert.match(html, /No hit: <eq>/)
+  assert.deepEqual([...used.keys()].sort(), ['sym-p_i', 'sym-r_u-i'])
+})
+
+test('linkifySymbols leaves math inside the symbols box alone', () => {
+  const md = createRenderer()
+  const lookup = new Map([['p_#', { id: 'sym-p_i', href: '#sym-p_i' }]])
+  const body = md.render('::: symbols\n- $p_i$ : def\n:::\n\nBody $p_i$.\n')
+  const { html } = linkifySymbols(body, lookup)
+  const box = html.match(/<div class="symbols">[\s\S]*?<\/div>/)[0]
+  assert.doesNotMatch(box, /symref/)
+  assert.match(html, /<a class="symref" href="#sym-p_i"/)
+})
+
+test('previewAssets emits both preview maps and one script', () => {
+  const out = previewAssets({ 4: '<span>eq</span>' }, { 'sym-p_i': '<p>def</p>' })
+  assert.match(out, /EQ_PREVIEWS = \{"4":/)
+  assert.match(out, /SYM_PREVIEWS = \{"sym-p_i":/)
+  assert.match(out, /symref/)
+  assert.equal(previewAssets({}, {}), '')
+})
+
+test('cli renders symbol tooltips and writes sym-map.json', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tn-sym-'))
+  fs.writeFileSync(path.join(dir, 'ch01-fix.md'), [
+    '# Sym Fixture', '',
+    '::: symbols',
+    '- $p_i$ : failure probability of machine $M_i$',
+    '- $L(i)$ : line built around buffer $i$',
+    ':::', '',
+    'Fails with $p_2$ each cycle, see line $L(3)$.', '',
+  ].join('\n'))
+  const out = execFileSync('node',
+    [path.join(import.meta.dirname, 'render.mjs'), path.join(dir, 'ch01-fix.md')],
+    { encoding: 'utf8' }).trim()
+  const html = fs.readFileSync(out, 'utf8')
+  assert.match(html, /<li id="sym-p_i">/)
+  assert.match(html, /<a class="symref" href="#sym-p_i"/)
+  assert.match(html, /SYM_PREVIEWS/)
+  const map = JSON.parse(fs.readFileSync(path.join(dir, 'build', 'sym-map.json'), 'utf8'))
+  assert.equal(map['en:p_#'].file, 'ch01-fix.html')
+  assert.equal(map['en:p_#'].latex, 'p_i')
+})
+
+test('cli resolves symbols defined in another chapter through sym-map.json', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tn-symx-'))
+  fs.mkdirSync(path.join(dir, 'build'))
+  fs.writeFileSync(path.join(dir, 'build', 'sym-map.json'), JSON.stringify({
+    'en:z_#': { file: 'ch01-other.html', id: 'sym-z_i', latex: 'z_i', def: 'an external thing' },
+  }))
+  fs.writeFileSync(path.join(dir, 'ch02-fix.md'), '# X\n\nUses $z_2$ here.\n')
+  const out = execFileSync('node',
+    [path.join(import.meta.dirname, 'render.mjs'), path.join(dir, 'ch02-fix.md')],
+    { encoding: 'utf8' }).trim()
+  const html = fs.readFileSync(out, 'utf8')
+  assert.match(html, /<a class="symref" href="ch01-other\.html#sym-z_i"/)
+  assert.match(html, /SYM_PREVIEWS = \{"sym-z_i":/)
 })
 
 test('injectEqAnchors ids tagged sections in order', async () => {

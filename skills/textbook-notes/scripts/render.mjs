@@ -32,6 +32,16 @@ export function createRenderer() {
     katexOptions: { throwOnError: false },
   })
   md.use(anchor, { slugify })
+  md.use(container, 'symbols', {
+    render(tokens, idx) {
+      const tok = tokens[idx]
+      if (tok.nesting === 1) {
+        const custom = tok.info.trim().slice('symbols'.length).trim()
+        return `<div class="symbols"><p class="symbols-title">${md.utils.escapeHtml(custom || 'Notation')}</p>\n`
+      }
+      return '</div>\n'
+    },
+  })
   for (const [name, meta] of Object.entries(CALLOUTS)) {
     md.use(container, name, {
       render(tokens, idx) {
@@ -82,7 +92,7 @@ export function linkifyEqRefs(src, resolve) {
     if (i % 2 === 1) return seg
     return seg.split('\n').map(line => {
       if (line.trimStart().startsWith(':::')) return line
-      return line.replace(/\((\d+[a-z]?)\)/g, (m, tag) => {
+      return line.replace(/\((\d+(?:\.\d+)*[a-z]?)\)/g, (m, tag) => {
         const href = resolve(tag)
         return href ? `<a class="eqref" data-eq="${tag}" href="${href}">(${tag})</a>` : m
       })
@@ -102,36 +112,133 @@ export function injectEqAnchors(html, src) {
   })
 }
 
-export function eqPreviewAssets(previews) {
-  if (!Object.keys(previews).length) return ''
-  const json = JSON.stringify(previews).replace(/<\//g, '<\\/')
+export function previewAssets(eqPreviews, symPreviews) {
+  if (!Object.keys(eqPreviews).length && !Object.keys(symPreviews).length) return ''
+  const json = o => JSON.stringify(o).replace(/<\//g, '<\\/')
   return `
 <script>
-const EQ_PREVIEWS = ${json};
-let eqTip;
-function eqShowTip(a) {
-  const html = EQ_PREVIEWS[a.dataset.eq];
+const EQ_PREVIEWS = ${json(eqPreviews)};
+const SYM_PREVIEWS = ${json(symPreviews)};
+let tip;
+function showTip(a, html) {
   if (!html) return;
-  if (!eqTip) {
-    eqTip = document.createElement('div');
-    eqTip.className = 'eq-preview';
-    document.body.appendChild(eqTip);
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.className = 'hover-preview';
+    document.body.appendChild(tip);
   }
-  eqTip.innerHTML = html;
-  eqTip.style.display = 'block';
+  tip.innerHTML = html;
+  tip.style.display = 'block';
   const r = a.getBoundingClientRect();
-  const w = eqTip.offsetWidth;
+  const w = tip.offsetWidth;
   const maxLeft = window.scrollX + document.documentElement.clientWidth - w - 8;
-  eqTip.style.left = Math.max(8, Math.min(r.left + window.scrollX, maxLeft)) + 'px';
-  eqTip.style.top = (r.bottom + window.scrollY + 8) + 'px';
+  tip.style.left = Math.max(8, Math.min(r.left + window.scrollX, maxLeft)) + 'px';
+  tip.style.top = (r.bottom + window.scrollY + 8) + 'px';
 }
+function hideTip() { if (tip) tip.style.display = 'none'; }
 document.addEventListener('DOMContentLoaded', () => {
   for (const a of document.querySelectorAll('a.eqref')) {
-    a.addEventListener('mouseenter', () => eqShowTip(a));
-    a.addEventListener('mouseleave', () => { if (eqTip) eqTip.style.display = 'none'; });
+    a.addEventListener('mouseenter', () => showTip(a, EQ_PREVIEWS[a.dataset.eq]));
+    a.addEventListener('mouseleave', hideTip);
+  }
+  for (const a of document.querySelectorAll('a.symref')) {
+    a.addEventListener('mouseenter', () => showTip(a,
+      a.dataset.syms.split(' ').map(id => SYM_PREVIEWS[id]).filter(Boolean).join('')));
+    a.addEventListener('mouseleave', hideTip);
+    a.addEventListener('click', hideTip);
   }
 });
 </script>`
+}
+
+/* ---- symbol definitions --------------------------------------------------
+   A "::: symbols" block holds one "- $latex$ : definition" line per symbol
+   and renders as a notation box whose entries carry #sym-* anchors. Every
+   inline math occurrence of a defined symbol becomes a link to its entry
+   with a hover preview of the definition. Occurrences are matched after
+   index normalization, so p_2, p_u(i-1), N_{i+1} all resolve to the p_i,
+   p_u(i), N_i entries; role subscripts (u, d, s, b) stay literal. Symbols
+   defined in other chapters of the same book resolve through
+   build/sym-map.json, per language, with the same rebuild caveat as
+   eq-map.json. */
+
+const IDX_RE = /^[ijkt0-9+\-]+$/
+const SYM_ENTRY_RE = /^-\s+\$([^$]+)\$\s*[:：]\s*(.+?)\s*$/
+
+export function normalizeSym(tex) {
+  let s = tex.replace(/\\[,;:!]/g, '').replace(/\s+/g, '')
+  s = s.replace(/_\{(\w)\}/g, '_$1')
+  s = s.replace(/_\{([^{}]*)\}/g, (m, a) => (IDX_RE.test(a) ? '_#' : m))
+  s = s.replace(/_([ijkt0-9])(?![a-zA-Z0-9])/g, '_#')
+  s = s.replace(/\(([^()]*)\)/g, (m, a) => (IDX_RE.test(a) ? '(#)' : m))
+  return s
+}
+
+export function collectSymbols(src) {
+  const out = []
+  const ids = new Set()
+  for (const block of src.matchAll(/^:{3,}\s*symbols[^\n]*\n([\s\S]*?)^:{3,}\s*$/gm)) {
+    for (const line of block[1].split('\n')) {
+      if (!line.trimStart().startsWith('- ')) continue
+      const m = line.trim().match(SYM_ENTRY_RE)
+      if (!m) {
+        console.warn(`warning: symbols entry not "- $latex$ : definition": ${line.trim()}`)
+        out.push(null)
+        continue
+      }
+      let id = 'sym-' + m[1].replace(/\\/g, '').replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '')
+      for (let n = 2; ids.has(id); n++) id = `${id}-${n}`
+      ids.add(id)
+      out.push({ key: m[1], def: m[2], norm: normalizeSym(m[1]), id })
+    }
+  }
+  return out
+}
+
+export function injectSymAnchors(html, symbols) {
+  let i = 0
+  return html.replace(/(<div class="symbols">[\s\S]*?<\/div>)/g, box =>
+    box.replace(/<li>/g, li => {
+      const sym = symbols[i++]
+      return sym ? `<li id="${sym.id}">` : li
+    }))
+}
+
+function decodeEntities(s) {
+  return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+}
+
+function splitTopCommas(tex) {
+  const parts = []
+  let depth = 0, cur = ''
+  for (const ch of tex) {
+    if ('({['.includes(ch)) depth++
+    else if (')}]'.includes(ch)) depth--
+    if (ch === ',' && depth === 0) { parts.push(cur); cur = '' } else cur += ch
+  }
+  parts.push(cur)
+  return parts.filter(p => p.trim())
+}
+
+export function linkifySymbols(html, lookup) {
+  const used = new Map()
+  const out = html.split(/(<div class="symbols">[\s\S]*?<\/div>)/g).map((seg, i) => {
+    if (i % 2 === 1) return seg
+    return seg.replace(/<eq>[\s\S]*?<\/eq>/g, eq => {
+      const ann = eq.match(/<annotation encoding="application\/x-tex">([\s\S]*?)<\/annotation>/)
+      if (!ann) return eq
+      const hits = []
+      for (const part of splitTopCommas(decodeEntities(ann[1]))) {
+        const hit = lookup.get(normalizeSym(part))
+        if (hit && !hits.includes(hit)) hits.push(hit)
+      }
+      if (!hits.length) return eq
+      for (const h of hits) used.set(h.id, h)
+      return `<a class="symref" href="${hits[0].href}" data-syms="${hits.map(h => h.id).join(' ')}">${eq}</a>`
+    })
+  }).join('')
+  return { html: out, used }
 }
 
 export function extractToc(md, src) {
@@ -231,6 +338,25 @@ function main() {
   fs.mkdirSync(path.dirname(mapPath), { recursive: true })
   fs.writeFileSync(mapPath, JSON.stringify(eqMap, null, 1))
 
+  const syms = collectSymbols(src)
+  const symMapPath = path.join(path.dirname(input), 'build', 'sym-map.json')
+  let symMap = {}
+  try { symMap = JSON.parse(fs.readFileSync(symMapPath, 'utf8')) } catch {}
+  for (const s of syms) {
+    if (s) symMap[`${lang}:${s.norm}`] = { file: outName, id: s.id, latex: s.key, def: s.def }
+  }
+  fs.writeFileSync(symMapPath, JSON.stringify(symMap, null, 1))
+
+  const symLookup = new Map()
+  for (const [mk, v] of Object.entries(symMap)) {
+    const sep = mk.indexOf(':')
+    if (mk.slice(0, sep) !== lang || v.file === outName) continue
+    symLookup.set(mk.slice(sep + 1), { id: v.id, href: `${v.file}#${v.id}`, latex: v.latex, def: v.def })
+  }
+  for (const s of syms) {
+    if (s) symLookup.set(s.norm, { id: s.id, href: `#${s.id}`, latex: s.key, def: s.def })
+  }
+
   const selfTags = new Map(eqs.map(e => [e.tag, e.latex]))
   const usedTags = new Set()
   const linked = linkifyEqRefs(src, tag => {
@@ -242,15 +368,23 @@ function main() {
 
   let body = md.render(linked)
   body = injectEqAnchors(body, linked)
+  body = injectSymAnchors(body, syms)
+  const { html: symLinked, used: usedSyms } = linkifySymbols(body, symLookup)
+  body = symLinked
   body = inlineImages(body, path.dirname(input))
   body = rewriteMdLinks(body)
 
-  const previews = {}
+  const eqPreviews = {}
   for (const tag of usedTags) {
     const latex = selfTags.get(tag) ?? eqMap[`${lang}:${tag}`]?.latex
-    if (latex) previews[tag] = katex.renderToString(latex, { displayMode: true, throwOnError: false })
+    if (latex) eqPreviews[tag] = katex.renderToString(latex, { displayMode: true, throwOnError: false })
   }
-  body += eqPreviewAssets(previews)
+  const symPreviews = {}
+  for (const [id, s] of usedSyms) {
+    symPreviews[id] = `<p class="sym-row">${katex.renderToString(s.latex, { throwOnError: false })}`
+      + `<span class="sym-sep"> : </span>${md.renderInline(s.def)}</p>`
+  }
+  body += previewAssets(eqPreviews, symPreviews)
   const title = (src.match(/^#\s+(.+)$/m) || [null, path.basename(input, '.md')])[1]
   const skillCss = fs.readFileSync(new URL('../assets/style.css', import.meta.url), 'utf8')
   const toc = renderToc(extractToc(md, src))
