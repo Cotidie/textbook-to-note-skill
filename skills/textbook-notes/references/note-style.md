@@ -152,6 +152,13 @@ no "not in the book", "책에 없는 내용", "the book leaves this open",
 signal; the phrases are bookkeeping noise. Naming a concrete outside
 source ("this is Tweedie's formula") is content and stays.
 
+Compress boxes hard. A box states its point and stops; cut background
+theory, named frameworks, and practical-treatment digressions the point
+survives without. Deletion test: remove a sentence, and if the box still
+answers its title, the sentence was padding. Depth arrives on request
+through revise mode, never preemptively. (A `gap` or `proof` box carrying a
+derivation is long because the derivation is; its prose still obeys this.)
+
 Two things never get a box:
 
 - Definitions and theorem STATEMENTS. They belong in the body prose; they
