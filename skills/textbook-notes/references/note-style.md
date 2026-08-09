@@ -102,6 +102,9 @@ The note reads as one continuous story, not a stack of definitions.
   algebra inside a `::: gap` callout.
 - Prefer aligned derivations (`\begin{aligned}`) over prose descriptions
   of algebra. Let the math talk; keep the prose around it short.
+- No stacked fractions (`\frac`) in inline math: they cramp the line and
+  are hard to read. Give the equation its own display line, or write the
+  slash form inline ($1/e_d = 1 + p_d/r_d$).
 - Break wide equations into two or more `\begin{aligned}` lines instead of
   letting them scroll horizontally. Rough limit: if a display equation
   would not fit in about 80 characters of LaTeX terms, split it at an
