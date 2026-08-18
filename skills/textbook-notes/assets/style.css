@@ -215,6 +215,8 @@ a.symref {
   text-underline-offset: 3px;
 }
 a.symref:hover { background: color-mix(in srgb, var(--lavender) 18%, transparent); border-radius: 4px; }
+.katex [data-sym] { cursor: pointer; }
+.katex [data-sym]:hover { background: color-mix(in srgb, var(--lavender) 18%, transparent); border-radius: 4px; }
 .hover-preview .sym-row { margin: 8px 0; }
 .hover-preview .sym-sep { color: var(--muted); }
 @media print { a.symref { text-decoration: none; } }

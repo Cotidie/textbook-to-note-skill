@@ -259,3 +259,28 @@ test('injectEqAnchors ids tagged sections in order', async () => {
   const out = injectEqAnchors(html, src)
   assert.equal(out, '<section class="eq-block" id="eq-4">x</section><section>y</section><section class="eq-block" id="eq-5">z</section>')
 })
+
+test('wrapDisplaySymbols wraps defined symbols inside display math', async () => {
+  const { wrapDisplaySymbols } = await import('./render.mjs')
+  const lookup = new Map([
+    ['P(#)', { id: 'sym-P-i', href: '#sym-P-i' }],
+    ['p_u(#)', { id: 'sym-p_u-i', href: '#sym-p_u-i' }],
+    ['\\mathbf{p}(i-1;001)', { id: 'sym-p001', href: '#sym-p001' }],
+  ])
+  const src = 'x\n\n$$p_u(i) = \\frac{\\mathbf{p}(i-1,001)}{P(i)} \\text{prob up} \\tag{4.1}$$\n'
+  const { src: out, used } = wrapDisplaySymbols(src, lookup)
+  assert.match(out, /\\htmlData\{sym=sym-p_u-i, symhref=#sym-p_u-i\}\{p_u\(i\)\}/)
+  assert.match(out, /\\htmlData\{sym=sym-P-i, symhref=#sym-P-i\}\{P\(i\)\}/)
+  assert.match(out, /\\htmlData\{sym=sym-p001, symhref=#sym-p001\}\{\\mathbf\{p\}\(i-1,001\)\}/)
+  assert.match(out, /\\text\{prob up\}/)
+  assert.match(out, /\\tag\{4\.1\}/)
+  assert.equal(used.size, 3)
+})
+
+test('wrapDisplaySymbols leaves inline math and unknown symbols alone', async () => {
+  const { wrapDisplaySymbols } = await import('./render.mjs')
+  const lookup = new Map([['k', { id: 'sym-k', href: '#sym-k' }]])
+  const { src: out } = wrapDisplaySymbols('$k$ stays, $$i = 1, \\dots, k-1$$', lookup)
+  assert.match(out, /^\$k\$ stays/)
+  assert.match(out, /\\htmlData\{sym=sym-k, symhref=#sym-k\}\{k\}-1\$\$/)
+})

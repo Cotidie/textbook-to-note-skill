@@ -113,6 +113,8 @@ as an anchored notation box. Every inline math occurrence of a defined
 symbol then shows the definition on hover and jumps to the entry on
 click. Occurrences match after index normalization, so `p_2` and
 `p_u(i-1)` resolve to the `p_i` and `p_u(i)` entries, and comma lists
-like `$p_u(i), r_u(i)$` match each part. Cross-chapter resolution works
+like `$p_u(i), r_u(i)$` match each part. Defined symbols inside display
+equations (`$$...$$`) get the same hover and click-to-jump, wrapped at
+render time via KaTeX `\htmlData`. Cross-chapter resolution works
 via `build/sym-map.json`, same per-language, rebuild-together caveat as
 equations. Authoring rules live in `references/note-style.md`.

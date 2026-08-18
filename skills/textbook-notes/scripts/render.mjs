@@ -29,7 +29,11 @@ export function createRenderer() {
   md.use(texmath, {
     engine: katex,
     delimiters: 'dollars',
-    katexOptions: { throwOnError: false },
+    katexOptions: {
+      throwOnError: false,
+      trust: ctx => ctx.command === '\\htmlData',
+      strict: code => (code === 'htmlExtension' ? 'ignore' : 'warn'),
+    },
   })
   md.use(anchor, { slugify })
   md.use(container, 'symbols', {
@@ -147,6 +151,11 @@ document.addEventListener('DOMContentLoaded', () => {
     a.addEventListener('mouseleave', hideTip);
     a.addEventListener('click', hideTip);
   }
+  for (const el of document.querySelectorAll('.katex [data-sym]')) {
+    el.addEventListener('mouseenter', () => showTip(el, SYM_PREVIEWS[el.dataset.sym]));
+    el.addEventListener('mouseleave', hideTip);
+    el.addEventListener('click', () => { hideTip(); if (el.dataset.symhref) location.href = el.dataset.symhref; });
+  }
 });
 </script>`
 }
@@ -239,6 +248,45 @@ export function linkifySymbols(html, lookup) {
     })
   }).join('')
   return { html: out, used }
+}
+
+/* Display equations: wrap each occurrence of a defined symbol in the TeX
+   source with \htmlData{sym=..., symhref=...} (rendered by KaTeX under the
+   trust option above), so symbols inside $$...$$ get the same hover
+   definition and click-to-jump as inline occurrences. Runs on the markdown
+   source AFTER collectEquations, so eq-map.json and eq previews stay clean. */
+
+const DISP_CAND_RE =
+  /(\\mathbf\{[a-zA-Z]\}|\\bar\s*[a-zA-Z]|\\[a-zA-Z]+|[A-Za-z])(_\{[^{}]+\}|_[A-Za-z0-9])?(\([^()]*\))?/g
+
+export function wrapDisplaySymbols(src, lookup) {
+  const used = new Map()
+  const out = src.replace(/\$\$([\s\S]*?)\$\$/g, (whole, tex) => {
+    const masks = []
+    const masked = tex.replace(/\\(tag|text|operatorname)\s*\{[^{}]*\}/g, m => {
+      masks.push(m)
+      return `\u0001${masks.length - 1}\u0001`
+    })
+    let res = '', last = 0, m
+    DISP_CAND_RE.lastIndex = 0
+    while ((m = DISP_CAND_RE.exec(masked))) {
+      const cand = m[0]
+      let hit = lookup.get(normalizeSym(cand))
+      if (!hit && cand.includes('(')) {
+        hit = lookup.get(normalizeSym(
+          cand.replace(/\(([^()]*)\)/g, (g, a) => `(${a.replace(/,/g, ';')})`)))
+      }
+      if (!hit) continue
+      used.set(hit.id, hit)
+      res += masked.slice(last, m.index)
+        + `\\htmlData{sym=${hit.id}, symhref=${hit.href}}{${cand}}`
+      last = m.index + cand.length
+    }
+    res += masked.slice(last)
+    res = res.replace(/\u0001(\d+)\u0001/g, (g, i) => masks[Number(i)])
+    return `$$${res}$$`
+  })
+  return { src: out, used }
 }
 
 export function extractToc(md, src) {
@@ -366,11 +414,13 @@ function main() {
     return null
   })
 
-  let body = md.render(linked)
-  body = injectEqAnchors(body, linked)
+  const disp = wrapDisplaySymbols(linked, symLookup)
+  let body = md.render(disp.src)
+  body = injectEqAnchors(body, disp.src)
   body = injectSymAnchors(body, syms)
   const { html: symLinked, used: usedSyms } = linkifySymbols(body, symLookup)
   body = symLinked
+  for (const [id, s] of disp.used) usedSyms.set(id, s)
   body = inlineImages(body, path.dirname(input))
   body = rewriteMdLinks(body)
 
