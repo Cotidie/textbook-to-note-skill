@@ -20,6 +20,9 @@ structure is not baby talk: never dumb down the terms, only the syntax.
 - Never use an em-dash.
 - Every symbol gets a plain-words name at first use ("r_u(i), the
   probability the upstream pseudo-machine is repaired in one step").
+  This includes appearances BEFORE the body definition (goal callouts,
+  hinges, section intros): never a bare symbol there; prefix the defining
+  word ("guidance 변수 $y$", not "$y$").
 - Teach by example. After an abstract statement, give one tiny concrete
   case with numbers when possible.
 - Read-aloud test: if you would stumble or re-read a sentence, break it up.
@@ -298,7 +301,7 @@ order. Rule: whoever produces the most faithful image wins.
 | Curve or plot computable from a formula, toy data, or a small runnable example (pdf shapes, convergence plots, a toy attention heatmap) | matplotlib, saved as SVG | Note palette: transparent background, ink and brand-accent lines, no top/right spines |
 | Nodes-and-arrows structure (block diagrams, architectures, pipelines, memory layouts, implication maps); execution-trace snapshots | Hand-authored SVG | Ink strokes, cream fills, one accent. Mermaid only when flowchart semantics fit |
 | Photographs, real-world objects, 3D renderings, canonical images a redraw would degrade (a Galton board photo, a famous historical chart) | Web download into `figures/chNN/` | First-class source, not a fallback. Note the source domain in the caption. Notes are personal study; licensing is not a gate |
-| Illustrative art with no factual content | codex-image skill | |
+| Illustrative art with no factual content | Comfy Cloud MCP (`partner_generate`, e.g. `bfl/flux-2-pro`) when a subscription is active; otherwise skip the figure | Never a CLI image tool |
 
 Crop command:
 `pdftoppm -png -r 200 -f <pdfpage> -l <pdfpage> book.pdf /tmp/page`,
