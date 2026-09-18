@@ -23,16 +23,18 @@ HTML file per chapter, printable to PDF.
 
 Update later with `/plugin marketplace update textbook-to-note-skill`.
 
-### B. Symlinked clone
+### B. Clone
 
 ```bash
 git clone git@github.com:Cotidie/textbook-to-note-skill.git
 cd textbook-to-note-skill && ./install.sh
 ```
 
-- `--copy` copies instead of symlinking, `--deps` runs `npm install` only
+`install.sh` copies the skill into `~/.claude/skills/` and runs `npm install`.
+
 - an existing install moves to `~/.claude/skill-backups/textbook-notes.<timestamp>`
 - `CLAUDE_SKILLS_DIR` overrides `~/.claude/skills`
+- `git pull && ./install.sh` to update
 
 Restart Claude Code after either route. Renderer dependencies install on the first
 build, or up front with `npm install` in the skill's `scripts/`.
@@ -90,5 +92,5 @@ npm install
 node --test render.test.mjs
 ```
 
-`node_modules/` is gitignored, `package-lock.json` is committed. With the symlink
-install, edits here take effect immediately.
+`node_modules/` is gitignored, `package-lock.json` is committed. Re-run
+`./install.sh` after editing the skill.
