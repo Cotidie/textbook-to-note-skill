@@ -1,139 +1,86 @@
 # textbook-to-note-skill
 
-A Claude Code skill that turns a math-heavy textbook chapter PDF into a
-Notion-style study note: TOC, callouts, server-rendered KaTeX math,
-gap-filled derivations, figures, and Q&A blocks.
+Claude Code skill that turns a math-heavy textbook chapter PDF into a Notion-style
+study note. Markdown is the source; the deliverable is one self-contained offline
+HTML file per chapter, printable to PDF.
 
-Markdown is the source of truth. The deliverable is one **self-contained
-offline HTML file per chapter**, printable to PDF.
+## Features
 
-```
-notebook/notes/<book-slug>/
-  index.md            # book cover: chapter list + per-unit status
-  chNN-<slug>.md      # one file per chapter (chNN-<slug>.ko.md for Korean)
-  figures/chNN/       # svg (redrawn) + png (cropped from the source PDF)
-  build/              # rendered html
-```
+- Callouts: `goal`, `gap`, `proof`, `insight`, `qa`, `warning`, `summary`
+- Server-rendered KaTeX, so a note opens with no network
+- `\tag{N}` equations become anchors; `(20)` in prose auto-links with a hover preview
+- Symbol glossary: hover a defined symbol for its definition, click to jump to the entry
+- Korean notes as parallel `chNN-<slug>.ko.md` files, cross-linked with the English one
 
 ## Install
 
-Pick one route. The plugin route is the least maintenance; the symlink
-route is right if you want to edit the skill and keep the edits in git.
-
-### A. Plugin (recommended)
-
-Inside Claude Code:
+### A. Plugin
 
 ```
 /plugin marketplace add Cotidie/textbook-to-note-skill
 /plugin install textbook-notes@textbook-to-note-skill
 ```
 
-Or from a shell:
-
-```bash
-claude plugin marketplace add Cotidie/textbook-to-note-skill
-claude plugin install textbook-notes@textbook-to-note-skill
-```
-
-Restart Claude Code. The renderer's npm dependencies are not vendored;
-the skill installs them itself the first time it builds a note. To do it
-up front instead:
-
-```bash
-cd ~/.claude/plugins/cache/textbook-to-note-skill/textbook-notes/*/skills/textbook-notes/scripts
-npm install
-```
-
-Updating later: `/plugin marketplace update textbook-to-note-skill`. The
-cache directory is keyed by version, so a version bump lands in a fresh
-directory and the dependencies install again on first use.
+Update later with `/plugin marketplace update textbook-to-note-skill`.
 
 ### B. Symlinked clone
 
 ```bash
 git clone git@github.com:Cotidie/textbook-to-note-skill.git
-cd textbook-to-note-skill
-./install.sh
+cd textbook-to-note-skill && ./install.sh
 ```
 
-`install.sh` symlinks `skills/textbook-notes` into `~/.claude/skills/` and
-runs `npm install`. Flags:
+- `--copy` copies instead of symlinking, `--deps` runs `npm install` only
+- an existing install moves to `~/.claude/skill-backups/textbook-notes.<timestamp>`
+- `CLAUDE_SKILLS_DIR` overrides `~/.claude/skills`
 
-| Flag | Effect |
-|---|---|
-| *(none)* | symlink into `~/.claude/skills/textbook-notes` |
-| `--copy` | copy instead of symlink (no clone to keep around) |
-| `--deps` | only run `npm install`, do not touch `~/.claude/skills` |
-
-An existing `~/.claude/skills/textbook-notes` is moved aside to
-`~/.claude/skill-backups/textbook-notes.<timestamp>` rather than
-overwritten. Set `CLAUDE_SKILLS_DIR` to install somewhere other than
-`~/.claude/skills`.
-
-### C. Manual
-
-```bash
-cp -a skills/textbook-notes ~/.claude/skills/
-cd ~/.claude/skills/textbook-notes/scripts && npm install
-```
-
-Restart Claude Code after any route so the skill is picked up.
+Restart Claude Code after either route. Renderer dependencies install on the first
+build, or up front with `npm install` in the skill's `scripts/`.
 
 ## Requirements
 
 | Need | Why | If missing |
 |---|---|---|
 | Claude Code | host | required |
-| Node.js 18+ and npm | server-rendered KaTeX, offline HTML | skill falls back to CDN-loaded KaTeX; notes then need a network connection to show math |
-| `poppler-utils` (`pdftotext`, `pdftoppm`) | locate chapters in the PDF, crop figures | chapter lookup gets slower (page images), figure cropping unavailable |
-| Python + Pillow | crop figures out of rendered pages | optional, figures only |
+| Node.js 18+ | offline KaTeX | falls back to CDN KaTeX, notes then need network |
+| `poppler-utils` | chapter lookup, figure crops | slower lookup, no cropping |
+| Python + Pillow | figure crops | figures only |
 
-Install poppler: `sudo apt install poppler-utils` (Debian/Ubuntu),
-`brew install poppler` (macOS).
+`sudo apt install poppler-utils` or `brew install poppler`.
 
 ## Usage
 
-Ask in plain language; the skill triggers on the request, not a command.
+Plain language triggers it, no command:
 
 ```
 summarize ch4 of ~/books/deep-learning.pdf
 4.2만 정리해줘
-왜 여기서 eigenvalue가 작아지면 문제가 되는지 모르겠어   # revise mode
+왜 여기서 eigenvalue가 작아지면 문제가 되는지 모르겠어   # revise
 ```
 
-Modes: **generate** (a chapter or subchapter, English or Korean),
-**revise** (answer a question, then patch the note and rebuild), and
-**build** (re-render HTML).
+- **generate**: chapter or subchapter, English or Korean
+- **revise**: answers in chat, patches the note, rebuilds
+- **build**: `node skills/textbook-notes/scripts/render.mjs ch04-slug.md` writes `build/ch04-slug.html`
 
-Build a chapter manually:
+Rebuild a book's chapters together after a style change so cross-chapter equation
+and symbol maps (`build/eq-map.json`, `build/sym-map.json`) resolve.
 
-```bash
-node <skill-dir>/scripts/render.mjs path/to/ch04-slug.md
-# -> path/to/build/ch04-slug.html
-```
-
-Rebuild every chapter of a book together after a stylesheet change, so
-cross-chapter equation references resolve via `build/eq-map.json`.
-
-## Repo layout
+## Layout
 
 ```
-.claude-plugin/
-  marketplace.json     # marketplace manifest (plugin route)
-  plugin.json          # plugin manifest, root is the plugin root
-skills/textbook-notes/
-  SKILL.md             # the skill itself
-  assets/style.css     # inlined into every rendered note
-  assets/template.md   # chapter skeleton
-  references/note-style.md   # callout vocabulary, writing rules, figure pipeline
-  scripts/render.mjs   # markdown -> self-contained html
-  scripts/render.test.mjs
-install.sh
-```
+notebook/notes/<book-slug>/     # output
+  index.md                      # chapter list + per-unit status
+  chNN-<slug>.md                # one file per chapter
+  figures/chNN/                 # svg redraws + png crops
+  build/                        # rendered html
 
-`node_modules/` is gitignored; `package-lock.json` is committed, so
-`npm install` reproduces the same renderer everywhere.
+skills/textbook-notes/          # the skill
+  SKILL.md
+  assets/style.css              # inlined into every note
+  assets/template.md            # chapter skeleton
+  references/note-style.md      # writing rules, callouts, figure pipeline
+  scripts/render.mjs            # markdown -> self-contained html
+```
 
 ## Development
 
@@ -143,5 +90,5 @@ npm install
 node --test render.test.mjs
 ```
 
-With the symlink install, edits in this repo take effect immediately in
-Claude Code.
+`node_modules/` is gitignored, `package-lock.json` is committed. With the symlink
+install, edits here take effect immediately.
