@@ -23,21 +23,14 @@ HTML file per chapter, printable to PDF.
 
 Update later with `/plugin marketplace update textbook-to-note-skill`.
 
-### B. Clone
+### B. Copy
 
 ```bash
-git clone git@github.com:Cotidie/textbook-to-note-skill.git
-cd textbook-to-note-skill && ./install.sh
+cp -a skills/textbook-notes ~/.claude/skills/
+cd ~/.claude/skills/textbook-notes/scripts && npm install
 ```
 
-`install.sh` copies the skill into `~/.claude/skills/` and runs `npm install`.
-
-- an existing install moves to `~/.claude/skill-backups/textbook-notes.<timestamp>`
-- `CLAUDE_SKILLS_DIR` overrides `~/.claude/skills`
-- `git pull && ./install.sh` to update
-
-Restart Claude Code after either route. Renderer dependencies install on the first
-build, or up front with `npm install` in the skill's `scripts/`.
+Restart Claude Code after either route.
 
 ## Requirements
 
@@ -92,5 +85,5 @@ npm install
 node --test render.test.mjs
 ```
 
-`node_modules/` is gitignored, `package-lock.json` is committed. Re-run
-`./install.sh` after editing the skill.
+`node_modules/` is gitignored, `package-lock.json` is committed. Copy the skill
+over again after editing it.
