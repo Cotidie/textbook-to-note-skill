@@ -34,6 +34,19 @@ structure is not baby talk: never dumb down the terms, only the syntax.
   fragment connected reasoning into bullets.
 - Bullets are fragments, not essays: one line each when possible, no
   trailing sub-clauses. Use numbered lists only when order matters.
+- Notation and multi-slot definitions are written as a slot map, never as
+  a prose sentence. `**Kendall $A/B/m/b$** = arrival dist / process dist /
+  machines / max jobs`, then one sub-bullet per letter (`$M$ = exponential`).
+  Same for named systems: `**$M/M/1/b$** = exponential arrivals /
+  exponential process / 1 machine / at most $b$ jobs`. Never "A is the
+  arrival distribution, B is the process distribution, and the rest are
+  m and b".
+- Term-by-term readings of an equation are one bullet per term in
+  `term = role` form (`$s/k$ = per-part share of the setup`), not a
+  sentence that walks the terms ("the first term is..., the second...").
+- Cross-reference by equation number, `(8.14)`, not by location ("the
+  four relations of 8.6.2"): the renderer turns numbers into hover
+  previews, so the reader never scrolls back.
 
 ## Storytelling
 
@@ -77,6 +90,15 @@ The note reads as one continuous story, not a stack of definitions.
   book's language. H1 format: `Ch.N - <exact book chapter title>`.
 - Open each H2 section with a `::: goal` callout when the section solves a
   stated problem.
+- Presentation layout (the reader presents the note on a shared screen):
+  every H3 body is a one- or two-sentence lead followed by nested bullets.
+  Each top-level bullet starts with a bold keyword the presenter can read
+  aloud (`**정의**`, `**균형 조건**`, `**읽기**`, `**관찰 1**`,
+  `**교훈**`), sub-bullets carry the detail. Prose survives only in the
+  chapter `goal`, section leads, and hinges. Callout bodies use the same
+  bullets. Equations, figures and tables sit between bullets at column
+  level; a bullet may end with a colon to introduce the display equation
+  under it. Every bullet still obeys the fragment rule above.
 - Sections not yet distilled contain exactly the stub line shown in
   `assets/template.md`.
 
@@ -301,11 +323,28 @@ order. Rule: whoever produces the most faithful image wins.
 | Curve or plot computable from a formula, toy data, or a small runnable example (pdf shapes, convergence plots, a toy attention heatmap) | matplotlib, saved as SVG | Note palette: transparent background, ink and brand-accent lines, no top/right spines |
 | Nodes-and-arrows structure (block diagrams, architectures, pipelines, memory layouts, implication maps); execution-trace snapshots | Hand-authored SVG | Ink strokes, cream fills, one accent. Mermaid only when flowchart semantics fit |
 | Photographs, real-world objects, 3D renderings, canonical images a redraw would degrade (a Galton board photo, a famous historical chart) | Web download into `figures/chNN/` | First-class source, not a fallback. Note the source domain in the caption. Notes are personal study; licensing is not a gate |
-| Illustrative art with no factual content | Comfy Cloud MCP (`partner_generate`, e.g. `bfl/flux-2-pro`) when a subscription is active; otherwise skip the figure | Never a CLI image tool |
+| Concept schematic that carries notation (a station anatomy, an equation anatomy, a propagation chain) | Comfy Cloud MCP `partner_generate`, model `vertexai/nano-banana-pro` | Annotate like a paper figure: every symbol the section defines appears ON the figure with its role (`rate rₐ, CV cₐ`, `capacity rₑ = m/tₑ`, a legend box for notation). Spell each label verbatim in the prompt with true subscripts; the model renders them. Recipe below |
+| Illustrative art with no factual content | Same Comfy Cloud route | Never a CLI image tool |
 
 Crop command:
 `pdftoppm -png -r 200 -f <pdfpage> -l <pdfpage> book.pdf /tmp/page`,
 then crop with Python PIL.
+
+Comfy Cloud recipe (needs the user's cloud subscription; a "cloud
+subscription required" or "Payment Required" error means it is missing,
+stop and tell the user): `partner_generate` with `type: image`,
+`model: vertexai/nano-banana-pro`, `aspect_ratio: 16:9`, `confirm: true`
+once the user has asked for the figure, `wait_for_output: true`; then
+`wait_for_job` until completed, `get_output`, curl the returned
+`/api/s/...?raw=1` link, crop the empty margins with PIL, save under
+`figures/chNN/`. Style line for the prompt: "flat vector, cream background
+(#fffaf0), thin dark ink lines, one muted orange accent, clean sans-serif,
+true subscripts, no gradients, no shadows, no logos, no watermark". To fix
+one detail (a literal underscore, an overlapping legend, a missing label)
+pass the job back as `medias: [{role: "image", prompt_id, output_index:
+0}]` with an edit prompt that names the one change and says to keep
+everything else identical. Check the result for factual layout errors
+(machines chained in series when they should be parallel) before using it.
 
 Books with no figures at all (common for lecture notes): generate your
 own where a picture carries real explanatory weight, still capped by
