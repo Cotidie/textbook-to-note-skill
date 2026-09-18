@@ -117,12 +117,23 @@ The note reads as one continuous story, not a stack of definitions.
   are what survive after the algebra is forgotten.
 - Right after each equation, add one short sentence saying what it means
   in plain words. Skip it only when the surrounding prose already does.
-- Read load-bearing equations term by term: name the ROLE of each term
-  or factor, i.e. what it pushes toward, penalizes, rescales, weights,
-  or balances ("the drift pulls to 0, the noise pushes out", "the
-  regularization term penalizes large parameters"). A term whose role
-  you cannot name means the equation is not yet understood: dig, or
-  mark it as an open question for revise mode.
+- Read load-bearing equations term by term as a MECHANISM, not as
+  labels. A role is a quantity the reader can picture, in units they
+  can count: "$U = u/(1-u)$ = the number of jobs ahead of me when I
+  arrive", "$T = t_e$ = time to process one of them", "$U \times T$ =
+  time to clear the jobs ahead of me", "$V$ = how many times more pile
+  up than in the exponential baseline". Naming a factor "the
+  utilization term" or "the variability term" is a label and explains
+  nothing; it is the failure mode this rule exists to prevent. Then say
+  WHY the terms combine the way they do: multiplied because each is an
+  independent proportional scaling ("a 2x slower machine doubles every
+  wait"), added because they are sequential stretches of time. The
+  mechanism reading is the first bullet under the equation, before
+  examples, names, history, or ranges of validity. The section's central
+  equation gets the section; everything else in that section is shorter
+  than the reading. A term whose mechanism you cannot state means the
+  equation is not yet understood: dig, or mark it as an open question
+  for revise mode.
 - When the book jumps between two equations, restore the intermediate
   algebra inside a `::: gap` callout.
 - Prefer aligned derivations (`\begin{aligned}`) over prose descriptions
