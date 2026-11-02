@@ -46,6 +46,18 @@ export function createRenderer() {
       return '</div>\n'
     },
   })
+  // Folded worked example: `::: example Example 4.2: <noun-phrase title>` renders
+  // as <details>; the body is ordinary markdown (math included).
+  md.use(container, 'example', {
+    render(tokens, idx) {
+      const tok = tokens[idx]
+      if (tok.nesting === 1) {
+        const title = tok.info.trim().slice('example'.length).trim()
+        return `<details class="example"><summary>${md.utils.escapeHtml(title || 'Example')}</summary>\n`
+      }
+      return '</details>\n'
+    },
+  })
   for (const [name, meta] of Object.entries(CALLOUTS)) {
     md.use(container, name, {
       render(tokens, idx) {
@@ -65,6 +77,7 @@ export function createRenderer() {
 const MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.gif': 'image/gif', '.svg': 'image/svg+xml',
+  '.mp4': 'video/mp4', '.webm': 'video/webm',
 }
 
 /* ---- equation cross-references ------------------------------------------
@@ -91,12 +104,19 @@ export function collectEquations(src) {
   return out
 }
 
+// texmath reads "(N)" after a closing $$ as that equation's number, even across
+// a blank line. A zero-width space keeps such a paragraph as prose.
+export function guardEquationNumbers(src) {
+  return src.replace(/\$\$[^$]*\$\$(\s*\()?/g, block =>
+    block.endsWith('(') ? `${block.slice(0, -1)}​(` : block)
+}
+
 export function linkifyEqRefs(src, resolve) {
   return src.split(MATH_OR_CODE_RE).map((seg, i) => {
     if (i % 2 === 1) return seg
     return seg.split('\n').map(line => {
       if (line.trimStart().startsWith(':::')) return line
-      return line.replace(/\((\d+(?:\.\d+)*[a-z]?)\)/g, (m, tag) => {
+      return line.replace(/\((\d+(?:[.-]\d+)*[a-z]?)\)/g, (m, tag) => {
         const href = resolve(tag)
         return href ? `<a class="eqref" data-eq="${tag}" href="${href}">(${tag})</a>` : m
       })
@@ -183,6 +203,34 @@ export function normalizeSym(tex) {
   return s
 }
 
+/* sym-map.json outlives any one build. Rebuilding a chapter replaces all of
+   its entries, so a symbol cut from the note stops attaching to letters in
+   other chapters. */
+export function replaceChapterEntries(map, file, entries) {
+  for (const key of Object.keys(map)) {
+    if (map[key].file === file) delete map[key]
+  }
+  return Object.assign(map, entries)
+}
+
+// A bare letter, with or without an index (J, Y_k), names different things in
+// different chapters, so it resolves only inside the chapter that defines it.
+const CHAPTER_LOCAL_SYM_RE = /^[A-Za-z](_#|_[A-Za-z0-9])?$/
+
+export function buildSymLookup(symMap, lang, outName, syms) {
+  const lookup = new Map()
+  for (const [mapKey, entry] of Object.entries(symMap)) {
+    const sep = mapKey.indexOf(':')
+    const norm = mapKey.slice(sep + 1)
+    if (mapKey.slice(0, sep) !== lang || entry.file === outName || CHAPTER_LOCAL_SYM_RE.test(norm)) continue
+    lookup.set(norm, { id: entry.id, href: `${entry.file}#${entry.id}`, latex: entry.latex, def: entry.def })
+  }
+  for (const s of syms) {
+    if (s) lookup.set(s.norm, { id: s.id, href: `#${s.id}`, latex: s.key, def: s.def })
+  }
+  return lookup
+}
+
 export function collectSymbols(src) {
   const out = []
   const ids = new Set()
@@ -257,13 +305,17 @@ export function linkifySymbols(html, lookup) {
    source AFTER collectEquations, so eq-map.json and eq previews stay clean. */
 
 const DISP_CAND_RE =
-  /(\\mathbf\{[a-zA-Z]\}|\\bar\s*[a-zA-Z]|\\[a-zA-Z]+|[A-Za-z])(_\{[^{}]+\}|_[A-Za-z0-9])?(\([^()]*\))?/g
+  /(\\mathbf\{[a-zA-Z]\}|\\bar\s*(?:[a-zA-Z]|\{[a-zA-Z]\})|\\[a-zA-Z]+|[A-Za-z])(_\{[^{}]+\}|_[A-Za-z0-9])?(\([^()]*\))?/g
+
+// Arguments that spell a name, not math: their letters are never symbols.
+const DISP_LITERAL_RE =
+  /\\(?:tag|text\w*|operatorname\*?|math(?:rm|bb|cal|scr|sf|tt|it|frak)|begin|end)\s*\{[^{}]*\}|\\mathbf\s*\{[a-zA-Z]{2,}\}/g
 
 export function wrapDisplaySymbols(src, lookup) {
   const used = new Map()
   const out = src.replace(/\$\$([\s\S]*?)\$\$/g, (whole, tex) => {
     const masks = []
-    const masked = tex.replace(/\\(tag|text|operatorname)\s*\{[^{}]*\}/g, m => {
+    const masked = tex.replace(DISP_LITERAL_RE, m => {
       masks.push(m)
       return `\u0001${masks.length - 1}\u0001`
     })
@@ -278,8 +330,10 @@ export function wrapDisplaySymbols(src, lookup) {
       }
       if (!hit) continue
       used.set(hit.id, hit)
+      // The outer braces keep ^n, _n, \frac1n and \sqrt n parseable: KaTeX
+      // rejects a bare \htmlData as a script or an unbraced argument.
       res += masked.slice(last, m.index)
-        + `\\htmlData{sym=${hit.id}, symhref=${hit.href}}{${cand}}`
+        + `{\\htmlData{sym=${hit.id}, symhref=${hit.href}}{${cand}}}`
       last = m.index + cand.length
     }
     res += masked.slice(last)
@@ -312,17 +366,20 @@ export function renderToc(toc) {
   return `<nav class="toc"><p class="toc-label">Contents</p><ul>\n${items}\n</ul></nav>\n`
 }
 
+// Images (<img src>) and animations (<video src poster>) become data URIs so
+// the HTML stays one self-contained file.
 export function inlineImages(html, baseDir) {
-  return html.replace(/(<img[^>]*\ssrc=")([^"]+)(")/g, (m, pre, src, post) => {
-    if (/^(data:|https?:)/.test(src)) return m
-    const p = path.resolve(baseDir, decodeURI(src))
-    if (!fs.existsSync(p)) {
-      console.warn(`warning: missing image ${src}`)
-      return m
-    }
-    const mime = MIME[path.extname(p).toLowerCase()] || 'application/octet-stream'
-    return `${pre}data:${mime};base64,${fs.readFileSync(p).toString('base64')}${post}`
-  })
+  return html.replace(/<(?:img|video|source)\b[^>]*>/g, tag =>
+    tag.replace(/(\s(?:src|poster)=")([^"]+)(")/g, (m, pre, src, post) => {
+      if (/^(data:|https?:)/.test(src)) return m
+      const p = path.resolve(baseDir, decodeURI(src))
+      if (!fs.existsSync(p)) {
+        console.warn(`warning: missing media ${src}`)
+        return m
+      }
+      const mime = MIME[path.extname(p).toLowerCase()] || 'application/octet-stream'
+      return `${pre}data:${mime};base64,${fs.readFileSync(p).toString('base64')}${post}`
+    }))
 }
 
 export function rewriteMdLinks(html) {
@@ -345,7 +402,21 @@ export function katexCss() {
   return css
 }
 
+// One animation at a time: start from the top on entering the screen, pause on leaving.
+const ANIMATION_SCRIPT = `<script>
+for (const video of document.querySelectorAll('figure.anim video')) {
+  video.removeAttribute('autoplay')
+  video.pause()
+  new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) { video.currentTime = 0; video.play().catch(() => {}) }
+    else video.pause()
+  }, { threshold: 0.6 }).observe(video)
+}
+</script>
+`
+
 export function page({ title, tocHtml, bodyHtml, css }) {
+  const animationScript = bodyHtml.includes('<video') ? ANIMATION_SCRIPT : ''
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -359,7 +430,7 @@ ${css}
 <body>
 <main class="note">
 ${tocHtml}${bodyHtml}</main>
-</body>
+${animationScript}</body>
 </html>
 `
 }
@@ -382,6 +453,8 @@ function main() {
   const mapPath = path.join(path.dirname(input), 'build', 'eq-map.json')
   let eqMap = {}
   try { eqMap = JSON.parse(fs.readFileSync(mapPath, 'utf8')) } catch {}
+  // Keep old entries: prose may cite an equation cut from the note, and the
+  // hover preview still needs its LaTeX.
   for (const { tag, latex } of eqs) eqMap[`${lang}:${tag}`] = { file: outName, latex }
   fs.mkdirSync(path.dirname(mapPath), { recursive: true })
   fs.writeFileSync(mapPath, JSON.stringify(eqMap, null, 1))
@@ -390,20 +463,11 @@ function main() {
   const symMapPath = path.join(path.dirname(input), 'build', 'sym-map.json')
   let symMap = {}
   try { symMap = JSON.parse(fs.readFileSync(symMapPath, 'utf8')) } catch {}
-  for (const s of syms) {
-    if (s) symMap[`${lang}:${s.norm}`] = { file: outName, id: s.id, latex: s.key, def: s.def }
-  }
+  replaceChapterEntries(symMap, outName, Object.fromEntries(
+    syms.filter(Boolean).map(s => [`${lang}:${s.norm}`, { file: outName, id: s.id, latex: s.key, def: s.def }])))
   fs.writeFileSync(symMapPath, JSON.stringify(symMap, null, 1))
 
-  const symLookup = new Map()
-  for (const [mk, v] of Object.entries(symMap)) {
-    const sep = mk.indexOf(':')
-    if (mk.slice(0, sep) !== lang || v.file === outName) continue
-    symLookup.set(mk.slice(sep + 1), { id: v.id, href: `${v.file}#${v.id}`, latex: v.latex, def: v.def })
-  }
-  for (const s of syms) {
-    if (s) symLookup.set(s.norm, { id: s.id, href: `#${s.id}`, latex: s.key, def: s.def })
-  }
+  const symLookup = buildSymLookup(symMap, lang, outName, syms)
 
   const selfTags = new Map(eqs.map(e => [e.tag, e.latex]))
   const usedTags = new Set()
@@ -415,7 +479,7 @@ function main() {
   })
 
   const disp = wrapDisplaySymbols(linked, symLookup)
-  let body = md.render(disp.src)
+  let body = md.render(guardEquationNumbers(disp.src))
   body = injectEqAnchors(body, disp.src)
   body = injectSymAnchors(body, syms)
   const { html: symLinked, used: usedSyms } = linkifySymbols(body, symLookup)
@@ -435,6 +499,8 @@ function main() {
       + `<span class="sym-sep"> : </span>${md.renderInline(s.def)}</p>`
   }
   body += previewAssets(eqPreviews, symPreviews)
+  const katexErrors = body.match(/katex-error/g)?.length ?? 0
+  if (katexErrors) console.warn(`warning: ${katexErrors} KaTeX error(s) in ${input}`)
   const title = (src.match(/^#\s+(.+)$/m) || [null, path.basename(input, '.md')])[1]
   const skillCss = fs.readFileSync(new URL('../assets/style.css', import.meta.url), 'utf8')
   const toc = renderToc(extractToc(md, src))

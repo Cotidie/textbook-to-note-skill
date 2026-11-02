@@ -59,8 +59,16 @@ thead tr:not(:has(th:not(:empty))) { display: none; }
 th, td { border: 1px solid var(--hairline); padding: 8px 12px; text-align: left; }
 th { color: var(--ink); font-weight: 600; background: color-mix(in srgb, var(--cream) 60%, white); }
 
+details.example { margin: 16px 0; padding: 8px 14px; border-left: 3px solid var(--hairline); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--cream) 40%, white); }
+details.example > summary { cursor: pointer; font-weight: 600; color: var(--muted); list-style: none; }
+details.example > summary::-webkit-details-marker { display: none; }
+details.example > summary::before { content: "▸ "; }
+details.example[open] > summary::before { content: "▾ "; }
+details.example[open] > summary { color: var(--ink); margin-bottom: 8px; }
+
 figure { margin: 24px 0; text-align: center; }
 figure img, p img { max-width: 100%; }
+figure video { max-width: 100%; border: 1px solid var(--hairline); border-radius: 6px; }
 figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
 
 .fig-row { display: flex; gap: 16px; align-items: flex-end; }

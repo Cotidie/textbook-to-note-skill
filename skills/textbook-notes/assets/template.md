@@ -1,42 +1,45 @@
-# Ch.N - <Chapter Title>
+# Ch.N - <Book's chapter title>
 
 | | |
 |---|---|
-| **Book** | <Book Title, Author> |
+| **Book** | <Book title, author> |
 | **Source** | pp. <first>-<last> |
 | **Status** | <in progress / complete> |
-| **Versions** | <cross-link to the parallel-language note, when one exists> |
 
-::: goal
-<The single question this chapter answers, in one or two sentences.>
+::: goal 목표
+<The question this chapter answers.>
 :::
 
-## N.1 <Section Title>
+## N.1 <Book's section title>
 
-<Plain-language framing paragraph: why this section exists. Definitions
-and theorems go here, in the body, with every symbol named.>
-
-::: symbols
-- $<latex>$ : <role in plain words, math allowed; place the block where
-  the book introduces these symbols>
+::: goal 목표
+<The question this section answers.>
 :::
 
-<Body: short paragraphs, display math for every load-bearing equation.>
+### <Subsection title>
 
-::: gap <What is being derived or verified>
-<One-line strategy first: where this is headed and by what moves. Then
-the derivation or check the book skipped, each step labeled by purpose.>
+<Short sentence.>
+
+$$<equation> \tag{N.1-1}$$
+
+<What it means, in a short sentence.>
+
+::: example Example N.1-1: <noun-phrase result>
+<A skippable example, proof, or precondition.>
 :::
 
-::: qa <A novel question, not a routine comprehension check>
-<The full answer.>
+::: symbols 기호
+- $<latex>$ : <role in plain words>
 :::
 
-## N.2 <Section Title>
+::: summary
+<The answer to this section's goal, in one or two lines.>
+:::
 
-_Not distilled yet._
+## Summary
+
+<The chapter's thread in a few lines, and the problem the next chapter takes up.>
 
 ::: summary Chapter takeaway
-<1-2 lines: what the reader must remember from this chapter. Goes at the
-very end, after the last section.>
+<What the reader must remember.>
 :::

@@ -1,120 +1,76 @@
 ---
 name: textbook-notes
-description: 'Use when the user asks to summarize/distill a textbook chapter or subchapter (e.g. "ch4", "4.2") into a study note, asks follow-up questions to revise a note, appends chapters, or rebuilds note HTML. Distills dense, math-heavy textbook chapters (PDF) into Notion-style study notes with callouts, KaTeX math, gap-filled derivations, and Q&A blocks. Markdown source, self-contained offline HTML output, printable to PDF. Korean triggers - 전공서적 정리, 교과서 정리, 챕터 요약, 정리 노트, N장 정리, 서브챕터 정리, 이해 안 되는 부분 질문.'
+description: 'Use when the user asks to summarize/distill a textbook chapter or subchapter (e.g. "ch4", "4.2") into a study note, asks follow-up questions to revise a note, appends chapters, or rebuilds note HTML. Turns dense, math-heavy textbook chapters (PDF) into study notes read like a newspaper, through three passes: accurate draft, reshape, visuals (ManimGX animations and generated figures). Markdown source, self-contained offline HTML output, printable to PDF. Korean triggers - 전공서적 정리, 교과서 정리, 챕터 요약, 정리 노트, N장 정리, 서브챕터 정리, 이해 안 되는 부분 질문.'
 ---
 
 # textbook-notes
 
-Turn a textbook chapter (or subchapter) PDF into a study note styled after
-a Notion export: TOC, heading hierarchy, callouts, server-rendered KaTeX
-math, figures, and Q&A. Markdown is the source of truth; the deliverable
-is one self-contained HTML file per chapter.
+Turn a textbook chapter PDF into a study note the reader takes in like a newspaper: short sentence, equation, picture. Markdown is the source. Each chapter builds to one self-contained HTML file. Notes are in Korean unless the user asks otherwise, with technical terms in English.
 
-Read `references/note-style.md` BEFORE writing any note content. It defines
-the callout vocabulary, writing rules, and figure pipeline. Notes target a
-first-year engineering undergraduate: short sentences, standard
-terminology, math kept exact.
+## Passes
 
-## Layout (per book)
+A chapter request runs all three passes without stopping, commits after each, and asks for review only at the end. "pass 2" or "pass 3" reruns one pass on an existing note. A subchapter request (`4.2`) runs the same passes on that unit.
+
+| Pass | Job | Reads | Writes | Runs as | Contract |
+|---|---|---|---|---|---|
+| 1 Draft | Accuracy and completeness | PDF | note, `figures/chNN/handoff.md` | `Agent` with `model: "fable"`, `effort: "xhigh"` | `references/pass-1-draft.md` |
+| 2 Reshape | Hierarchy, intuition, cuts, folds | Draft, handoff | Note, visuals list in handoff | Main session | `references/pass-2-reshape.md` |
+| 3 Visuals | Animations and figures | Note, handoff | `figures/chNN/`, HTML, `index.md` | Main session | `references/pass-3-visuals.md` |
+
+Passes 2 and 3 also follow `references/reading-rules.md`. Pass 1 does not read it.
+
+The Pass 1 brief is the PDF path, the unit, the output paths, and "read and follow `<skill-dir>/references/pass-1-draft.md`; spawn no sub-agents". Report its token use to the user. If Fable is unavailable, use `opus` at `xhigh` and say so.
+
+## Layout
 
 ```
-<project>/notebook/notes/<book-slug>/
-  index.md          # book cover: chapter list + per-unit status (done/stub)
-  chNN-<slug>.md    # one file per chapter
-  figures/chNN/     # svg (redrawn) + png (cropped from source PDF)
-  build/            # rendered html
+<notes>/<book-slug>/
+  index.md            # chapter list with status
+  chNN-<slug>.ko.md
+  figures/chNN/       # handoff.md (during passes), image_prompts.py, make_figures.py, anim-N-M.{py,mp4,png}
+  build/              # rendered html, eq-map.json, sym-map.json
 ```
 
-## Modes
-
-### generate <book.pdf> <unit> [language]
-
-`<unit>` is a chapter or subchapter: `ch4`, `4.2`, `4.2.1`. Appending a
-new chapter to an existing book is this same flow.
-`[language]` defaults to English; write the note body in Korean if asked
-(keep technical terms in English either way). A non-English note is a
-parallel file `chNN-<slug>.<lang>.md` (e.g. `.ko.md`) next to the English
-one, never a replacement; link both versions in index.md and cross-link
-them in each note's header table. Callout titles follow the note language
-(`::: goal 목표`); heading rules live in note-style.md.
-
-1. Locate the unit's page range (see "Locating a unit" below).
-2. Read those PDF pages with the Read tool (max 20 pages per call).
-3. Write or extend `chNN-<slug>.md` following `assets/template.md` and
-   `references/note-style.md`. When generating a subchapter only, keep all
-   other sections as stub headings with the stub line from template.md.
-4. Create figures (see note-style.md figure pipeline).
-5. Update index.md status table.
-6. Build (see build mode) and tell the user the output path.
-
-### revise
+## Revise
 
 The user asks about a part they do not understand, or requests a change.
 
-1. Answer the question in chat first.
-2. Patch the relevant section of the chapter .md: expand the derivation,
-   add a `::: qa` block with the question and answer, or fix the wording.
-3. Rebuild that chapter's HTML.
+1. Answer in chat first.
+2. Patch the note: fix the wording, or add a `::: qa` block with the question and answer.
+3. Rebuild.
 
-### build
+## Build
 
-```
-node <skill-dir>/scripts/render.mjs <chapter.md>
-```
-
-`<skill-dir>` is this skill's directory (the folder containing this
-SKILL.md); under a plugin install it is `${CLAUDE_PLUGIN_ROOT}/skills/textbook-notes`.
-
-Writes `<dir>/build/<chapter>.html`. Rebuild every .md in the book
-directory when the stylesheet or many files changed.
-
-First run only: `cd <skill-dir>/scripts && npm install`.
-If npm install fails, tell the user math will need a network connection,
-and emit HTML that loads KaTeX from a CDN (auto-render extension) instead,
-keeping the same body markup.
-
-## Locating a unit in a large PDF
-
-1. Try the book's TOC:
-   `pdftotext -f 1 -l 15 -layout book.pdf - | grep -nE "^ *4(\.[0-9])* "`
-2. If no TOC hit, scan page headers for the section number:
-   `for p in $(seq 1 10 <pages>); do echo "== $p"; pdftotext -f $p -l $p -layout book.pdf - | head -4; done`
-   then bisect manually.
-3. Book page numbers usually differ from PDF page numbers. Find the offset
-   from any page that prints its book page number, then convert.
-4. If the unit cannot be found, show the user the TOC lines you did find
-   and ask which unit they meant.
-5. Scanned books with no text layer: fall back to Reading page images and
-   warn that locating units is slower.
-
-## Callout syntax (implemented by scripts/render.mjs)
-
-Types: `goal`, `gap`, `proof`, `insight`, `qa`, `warning`, `summary`.
-Color semantics and box criteria live in `references/note-style.md`;
-`goal`/`summary` render as quiet bookends, the other five as boxes.
-
-Equation cross-references: display equations carrying `\tag{N}` become
-anchors; textual references like `(20)` in prose auto-link to them, with a
-hover preview of the equation. Works across chapters of the same book via
-`build/eq-map.json` (per language). Rebuild all chapters together; a
-forward reference to a not-yet-rendered chapter needs a second build pass.
+Run from the book directory:
 
 ```
-::: warning The trap of small eigenvalues
-Body markdown, math allowed.
-:::
+node <skill-dir>/scripts/render.mjs chNN-<slug>.ko.md
 ```
 
-Optional custom title after the type name; omit it for the default label.
+First run only: `cd <skill-dir>/scripts && npm install`. Equation and symbol maps are per book, so a forward reference to an unbuilt chapter needs a second build. A rebuild replaces that chapter's symbol map entries, so after cutting symbols, rebuild the other chapters too. Equation map entries stay, so prose citing a cut equation keeps its hover preview. The build prints a warning when a KaTeX error remains.
 
-Symbol definitions: a `::: symbols` block (title defaults to "Notation")
-holds one `- $latex$ : one-line definition` entry per symbol and renders
-as an anchored notation box. Every inline math occurrence of a defined
-symbol then shows the definition on hover and jumps to the entry on
-click. Occurrences match after index normalization, so `p_2` and
-`p_u(i-1)` resolve to the `p_i` and `p_u(i)` entries, and comma lists
-like `$p_u(i), r_u(i)$` match each part. Defined symbols inside display
-equations (`$$...$$`) get the same hover and click-to-jump, wrapped at
-render time via KaTeX `\htmlData`. Cross-chapter resolution works
-via `build/sym-map.json`, same per-language, rebuild-together caveat as
-equations. Authoring rules live in `references/note-style.md`.
+## Markdown syntax
+
+Start from `assets/template.md`.
+
+```
+::: goal 목표
+::: summary
+::: warning <title>
+::: insight <title>
+::: example <title>     (folded by default)
+::: symbols 기호         (- $latex$ : one-line definition)
+```
+
+Existing notes also use `gap` and `proof`, which still render. Use `qa` only in revise.
+
+- **Equation references:** a display equation with `\tag{5.2-11}` becomes an anchor. Prose `(5.2-11)` links to it with a hover preview.
+- **Symbols:** each `::: symbols` entry gives hover and click-to-jump on every occurrence, book-wide. A bare letter, with or without an index (`J`, `Y_k`), resolves only inside its own chapter. `Y_k` also attaches to `Y_1` and `Y_i` there, so skip a letter whose meaning changes within the chapter.
+- **Figure width:** `<img style="width:60%" src="...">`.
+
+Traps the renderer does not catch:
+
+- Math does not render in `<figure>` captions or callout titles. Use Unicode (φ₀, σ, Ωᵀ).
+- A math span ending in `=` (`$z = $`) swallows the prose after it.
+- `\dot\kappa_t` breaks when `\kappa_t` is a symbols key. Write `\dot{\kappa}_t`.
+- Multiple `\tag` in one `aligned` block is a KaTeX error.

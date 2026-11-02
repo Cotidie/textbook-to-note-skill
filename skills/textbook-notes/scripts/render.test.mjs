@@ -5,7 +5,26 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { createRenderer, extractToc, renderToc, inlineImages, rewriteMdLinks, katexCss, page, isMainModule, normalizeSym, collectSymbols, injectSymAnchors, linkifySymbols, previewAssets } from './render.mjs'
+import { createRenderer, extractToc, renderToc, inlineImages, rewriteMdLinks, katexCss, page, isMainModule, normalizeSym, collectSymbols, injectSymAnchors, linkifySymbols, previewAssets, guardEquationNumbers, linkifyEqRefs } from './render.mjs'
+
+test('a paragraph opening with a parenthesized number stays prose after a display equation', () => {
+  const src = '$$a$$\n\n(6.6) 에서 시작한다.\n\n$$(b)$$\n'
+  const html = createRenderer().render(guardEquationNumbers(src))
+  assert.match(html, /\(6\.6\) 에서 시작한다/)
+  assert.doesNotMatch(guardEquationNumbers(src), /\$\$​\(b/)
+})
+
+test('hyphenated book equation numbers cross-link', () => {
+  const out = linkifyEqRefs('식 (5.2-11)을 쓴다.', tag => (tag === '5.2-11' ? '#eq-5.2-11' : null))
+  assert.match(out, /class="eqref" data-eq="5\.2-11"/)
+})
+
+test('animations play only on screen, and pages without video carry no script', () => {
+  const withVideo = page({ title: 't', tocHtml: '', bodyHtml: '<figure class="anim"><video></video></figure>', css: '' })
+  const without = page({ title: 't', tocHtml: '', bodyHtml: '<p>x</p>', css: '' })
+  assert.match(withVideo, /IntersectionObserver/)
+  assert.doesNotMatch(without, /IntersectionObserver/)
+})
 
 test('renders inline and display math with KaTeX', () => {
   const md = createRenderer()
@@ -54,6 +73,24 @@ test('inlines local images as data uris, leaves remote alone', () => {
   assert.match(inlineImages('<img src="f.svg" alt="">', dir), /src="data:image\/svg\+xml;base64,/)
   const remote = '<img src="https://x.com/a.png">'
   assert.equal(inlineImages(remote, dir), remote)
+})
+
+test('renders a folded example as details with the title as summary', () => {
+  const md = createRenderer()
+  const html = md.render('::: example Example 4.2: 균일 pdf의 부피 비율\n확률은 $8/27$이다.\n:::\n')
+  assert.match(html, /<details class="example"><summary>Example 4.2: 균일 pdf의 부피 비율<\/summary>/)
+  assert.match(html, /katex/)
+  assert.match(html, /<\/details>/)
+})
+
+test('inlines a video and its poster, both attributes of one tag', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tn-'))
+  fs.writeFileSync(path.join(dir, 'a.mp4'), 'mp4')
+  fs.writeFileSync(path.join(dir, 'a.png'), 'png')
+  const out = inlineImages('<video src="a.mp4" poster="a.png" autoplay muted loop></video>', dir)
+  assert.match(out, /src="data:video\/mp4;base64,/)
+  assert.match(out, /poster="data:image\/png;base64,/)
+  assert.match(out, /autoplay muted loop/)
 })
 
 test('rewrites relative .md links to .html, leaves absolute urls', () => {
@@ -241,15 +278,15 @@ test('cli resolves symbols defined in another chapter through sym-map.json', () 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tn-symx-'))
   fs.mkdirSync(path.join(dir, 'build'))
   fs.writeFileSync(path.join(dir, 'build', 'sym-map.json'), JSON.stringify({
-    'en:z_#': { file: 'ch01-other.html', id: 'sym-z_i', latex: 'z_i', def: 'an external thing' },
+    'en:\\lambda_#': { file: 'ch01-other.html', id: 'sym-lambda_i', latex: '\\lambda_i', def: 'an external thing' },
   }))
-  fs.writeFileSync(path.join(dir, 'ch02-fix.md'), '# X\n\nUses $z_2$ here.\n')
+  fs.writeFileSync(path.join(dir, 'ch02-fix.md'), '# X\n\nUses $\\lambda_2$ here.\n')
   const out = execFileSync('node',
     [path.join(import.meta.dirname, 'render.mjs'), path.join(dir, 'ch02-fix.md')],
     { encoding: 'utf8' }).trim()
   const html = fs.readFileSync(out, 'utf8')
-  assert.match(html, /<a class="symref" href="ch01-other\.html#sym-z_i"/)
-  assert.match(html, /SYM_PREVIEWS = \{"sym-z_i":/)
+  assert.match(html, /<a class="symref" href="ch01-other\.html#sym-lambda_i"/)
+  assert.match(html, /SYM_PREVIEWS = \{"sym-lambda_i":/)
 })
 
 test('injectEqAnchors ids tagged sections in order', async () => {
@@ -282,5 +319,61 @@ test('wrapDisplaySymbols leaves inline math and unknown symbols alone', async ()
   const lookup = new Map([['k', { id: 'sym-k', href: '#sym-k' }]])
   const { src: out } = wrapDisplaySymbols('$k$ stays, $$i = 1, \\dots, k-1$$', lookup)
   assert.match(out, /^\$k\$ stays/)
-  assert.match(out, /\\htmlData\{sym=sym-k, symhref=#sym-k\}\{k\}-1\$\$/)
+  assert.match(out, /\\htmlData\{sym=sym-k, symhref=#sym-k\}\{k\}\}-1\$\$/)
+})
+
+test('wrapDisplaySymbols output parses after ^, _, and unbraced arguments', async () => {
+  const { wrapDisplaySymbols } = await import('./render.mjs')
+  const lookup = new Map([['n', { id: 'sym-n', href: '#sym-n' }]])
+  const { src: out } = wrapDisplaySymbols('$$\\sum_{i=1}^n x_n + \\frac1n + \\sqrt n$$', lookup)
+  assert.doesNotMatch(createRenderer().render(out), /katex-error/)
+})
+
+test('wrapDisplaySymbols leaves font and environment arguments alone', async () => {
+  const { wrapDisplaySymbols } = await import('./render.mjs')
+  const lookup = new Map(['a', 'X'].map(s => [s, { id: `sym-${s}`, href: `#sym-${s}` }]))
+  const src = '$$\\mathrm{diag}(a) \\mathbf{XX} \\begin{bmatrix} a \\end{bmatrix}$$'
+  const { src: out } = wrapDisplaySymbols(src, lookup)
+  assert.match(out, /\\mathrm\{diag\}/)
+  assert.match(out, /\\mathbf\{XX\}/)
+  assert.match(out, /\\begin\{bmatrix\}/)
+  assert.match(out, /\\end\{bmatrix\}/)
+  assert.doesNotMatch(createRenderer().render(out), /katex-error/)
+})
+
+test('replaceChapterEntries drops what a rebuilt chapter no longer defines', async () => {
+  const { replaceChapterEntries } = await import('./render.mjs')
+  const map = {
+    'ko:n': { file: 'ch06.ko.html', id: 'sym-n' },
+    'ko:J': { file: 'ch05.ko.html', id: 'sym-J' },
+  }
+  replaceChapterEntries(map, 'ch06.ko.html', { 'ko:z_u': { file: 'ch06.ko.html', id: 'sym-z_u' } })
+  assert.deepEqual(Object.keys(map).sort(), ['ko:J', 'ko:z_u'])
+})
+
+test('buildSymLookup keeps a bare letter inside the chapter that defines it', async () => {
+  const { buildSymLookup } = await import('./render.mjs')
+  const symMap = {
+    'ko:Y_#': { file: 'ch06.ko.html', id: 'sym-Y_k', latex: 'Y_k', def: 'other chapter letter' },
+    'ko:J': { file: 'ch06.ko.html', id: 'sym-J', latex: 'J', def: 'other chapter letter' },
+    'ko:\\mathbf{K}': { file: 'ch06.ko.html', id: 'sym-K', latex: '\\mathbf{K}', def: 'other chapter matrix' },
+    'en:\\mathbf{U}': { file: 'ch06.en.html', id: 'sym-U', latex: '\\mathbf{U}', def: 'other language' },
+  }
+  const own = [{ key: 'Z_i', norm: 'Z_#', id: 'sym-Z_i', def: 'own letter' }, null]
+  const lookup = buildSymLookup(symMap, 'ko', 'ch05.ko.html', own)
+  assert.deepEqual([...lookup.keys()].sort(), ['Z_#', '\\mathbf{K}'])
+  assert.equal(lookup.get('\\mathbf{K}').href, 'ch06.ko.html#sym-K')
+  assert.equal(lookup.get('Z_#').href, '#sym-Z_i')
+})
+
+test('wrapDisplaySymbols reads \\bar{J} as one symbol, not as J', async () => {
+  const { wrapDisplaySymbols } = await import('./render.mjs')
+  const lookup = new Map([
+    ['J', { id: 'sym-J', href: '#sym-J' }],
+    ['\\bar{J}', { id: 'sym-bar-J', href: '#sym-bar-J' }],
+  ])
+  const { src: out } = wrapDisplaySymbols('$$|\\bar{J}| = 1/|J|, \\quad |\\bar{J}_i|$$', lookup)
+  assert.match(out, /\\htmlData\{sym=sym-bar-J, symhref=#sym-bar-J\}\{\\bar\{J\}\}/)
+  assert.match(out, /\\htmlData\{sym=sym-J, symhref=#sym-J\}\{J\}/)
+  assert.match(out, /\|\\bar\{J\}_i\|/)
 })

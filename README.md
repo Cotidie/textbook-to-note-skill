@@ -1,16 +1,29 @@
 # textbook-to-note-skill
 
-Claude Code skill that turns a math-heavy textbook chapter PDF into a Notion-style
-study note. Markdown is the source; the deliverable is one self-contained offline
-HTML file per chapter, printable to PDF.
+Claude Code skill that turns a math-heavy textbook chapter PDF into a study note
+read like a newspaper: short sentence, equation, picture. Markdown is the source;
+the deliverable is one self-contained offline HTML file per chapter, printable to PDF.
 
 ## Features
 
-- Callouts: `goal`, `gap`, `proof`, `insight`, `qa`, `warning`, `summary`
+- Three passes per chapter: draft (accuracy), reshape (hierarchy, cuts, folds), visuals
+- ManimGX animations, generated figures, and matplotlib plots, inlined into the HTML
+- Callouts: `goal`, `summary`, `warning`, `insight`, folded `example`, and `qa` for revisions
 - Server-rendered KaTeX, so a note opens with no network
 - `\tag{N}` equations become anchors; `(20)` in prose auto-links with a hover preview
 - Symbol glossary: hover a defined symbol for its definition, click to jump to the entry
-- Korean notes as parallel `chNN-<slug>.ko.md` files, cross-linked with the English one
+- Korean by default with English technical terms, in `chNN-<slug>.ko.md`
+
+## Passes
+
+| Pass | Job | Runs as | Contract |
+|---|---|---|---|
+| 1 Draft | Accuracy and completeness | Fable subagent at `xhigh`, or Opus if unavailable | `references/pass-1-draft.md` |
+| 2 Reshape | Hierarchy, intuition, cuts, folds | Main session | `references/pass-2-reshape.md` |
+| 3 Visuals | Animations and figures | Main session | `references/pass-3-visuals.md` |
+
+A chapter request runs all three without stopping and commits after each. `pass 2` or
+`pass 3` reruns one pass on an existing note.
 
 ## Install
 
@@ -22,6 +35,9 @@ HTML file per chapter, printable to PDF.
 ```
 
 Update later with `/plugin marketplace update textbook-to-note-skill`.
+
+`assets/anim-template.py` imports `anim_kit` from `~/.claude/skills/textbook-notes/assets`,
+so animations need route B.
 
 ### B. Copy
 
@@ -37,9 +53,11 @@ Restart Claude Code after either route.
 | Need | Why | If missing |
 |---|---|---|
 | Claude Code | host | required |
-| Node.js 18+ | offline KaTeX | falls back to CDN KaTeX, notes then need network |
+| Node.js 18+ | HTML build, offline KaTeX | required |
 | `poppler-utils` | chapter lookup, figure crops | slower lookup, no cropping |
-| Python + Pillow | figure crops | figures only |
+| ManimGX, `ffmpeg` | animations | no animations |
+| `uv` | runs the figure scripts with numpy, Pillow, matplotlib | no generated figures or plots |
+| `openrouter-images` skill in `~/.claude/skills/` | image model figures | no image model figures |
 
 `sudo apt install poppler-utils` or `brew install poppler`.
 
@@ -53,28 +71,34 @@ summarize ch4 of ~/books/deep-learning.pdf
 왜 여기서 eigenvalue가 작아지면 문제가 되는지 모르겠어   # revise
 ```
 
-- **generate**: chapter or subchapter, English or Korean
+- **generate**: chapter or subchapter, through all three passes
 - **revise**: answers in chat, patches the note, rebuilds
-- **build**: `node skills/textbook-notes/scripts/render.mjs ch04-slug.md` writes `build/ch04-slug.html`
+- **build**: from the book directory, `node <skill-dir>/scripts/render.mjs chNN-<slug>.ko.md` writes `build/chNN-<slug>.ko.html`
 
-Rebuild a book's chapters together after a style change so cross-chapter equation
-and symbol maps (`build/eq-map.json`, `build/sym-map.json`) resolve.
+Rebuild a book's chapters together after cutting symbols, because a rebuild replaces
+that chapter's entries in `build/sym-map.json`. Entries in `build/eq-map.json` stay, so
+prose citing a cut equation keeps its hover preview.
 
 ## Layout
 
 ```
-notebook/notes/<book-slug>/     # output
-  index.md                      # chapter list + per-unit status
-  chNN-<slug>.md                # one file per chapter
-  figures/chNN/                 # svg redraws + png crops
-  build/                        # rendered html
+<notes>/<book-slug>/            # output
+  index.md                      # chapter list with status
+  chNN-<slug>.ko.md             # one file per chapter
+  figures/chNN/                 # handoff.md (during passes), image_prompts.py,
+                                # make_figures.py, anim-N-M.{py,mp4,png}
+  build/                        # rendered html, eq-map.json, sym-map.json
 
 skills/textbook-notes/          # the skill
   SKILL.md
   assets/style.css              # inlined into every note
   assets/template.md            # chapter skeleton
-  references/note-style.md      # writing rules, callouts, figure pipeline
+  assets/anim_kit.py            # palette, axes, beats, covariance helpers
+  assets/anim-template.py       # starting point for a scene
+  references/pass-*.md          # one contract per pass
+  references/reading-rules.md   # writing rules for passes 2 and 3
   scripts/render.mjs            # markdown -> self-contained html
+  scripts/make_images.py        # image model batch runner
 ```
 
 ## Development
