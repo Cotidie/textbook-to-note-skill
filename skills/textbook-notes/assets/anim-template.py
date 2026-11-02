@@ -1,13 +1,10 @@
 """Animation N.M: <the claim this animation shows, in one line> (Sec. N.k, Eq. N.k-j)."""
 
-import os
-import sys
-
+import manimgx as m
 import numpy as np
 
-sys.path.insert(0, os.path.expanduser("~/.claude/skills/textbook-notes/assets"))
-import manimgx as m  # noqa: E402
-from anim_kit import ACCENT, READOUT_POSITION, BeatScene, formula, plane  # noqa: E402
+# anim_kit은 스킬의 assets 폴더에 있다. manimgx를 PYTHONPATH=<skill-dir>/assets로 실행해야 찾는다.
+from anim_kit import ACCENT, READOUT_POSITION, BeatScene, formula, plane
 
 
 class SceneName(BeatScene):

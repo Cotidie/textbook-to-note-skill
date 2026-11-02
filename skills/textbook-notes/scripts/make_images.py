@@ -12,13 +12,32 @@ import subprocess
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 MODEL = "openai/gpt-image-2.5-sunburst"
-GENERATOR_DIRECTORY = os.path.expanduser("~/.claude/skills/openrouter-images/scripts")
 WHITE_THRESHOLD = 245
+
+
+def find_generator_directory():
+    # openrouter-images 스킬은 프로젝트 폴더, 사용자 폴더, 플러그인 캐시 중 어디에나 설치될 수 있다.
+    # 환경 변수가 있으면 그것을 쓰고, 없으면 가까운 위치부터 찾는다. 플러그인은 가장 최근 버전을 쓴다.
+    if "OPENROUTER_IMAGES_DIR" in os.environ:
+        return Path(os.environ["OPENROUTER_IMAGES_DIR"])
+    claude_home = Path.home() / ".claude"
+    working_folders = [Path.cwd(), *Path.cwd().parents]
+    candidates = [folder / ".claude" / "skills" / "openrouter-images" / "scripts" for folder in working_folders]
+    candidates.append(claude_home / "skills" / "openrouter-images" / "scripts")
+    plugin_copies = (claude_home / "plugins" / "cache").glob("*/*/*/skills/openrouter-images/scripts")
+    candidates.extend(sorted(plugin_copies, key=lambda folder: folder.stat().st_mtime, reverse=True))
+    for folder in candidates:
+        if (folder / "generate.ts").exists():
+            return folder
+    sys.exit("openrouter-images skill not found. Install it with "
+             "`gh skill install OpenRouterTeam/skills openrouter-images`, or set OPENROUTER_IMAGES_DIR "
+             "to its scripts folder.")
 
 STYLE = (
     "Clean textbook figure, flat vector style, pure white background (#ffffff). "
@@ -54,14 +73,17 @@ def save_with_transparent_white(image, output_path):
     return paletted.size
 
 
-def generate(name, aspect_ratio, content, output_directory):
+def generate(name, aspect_ratio, content, output_directory, generator_directory):
     with tempfile.TemporaryDirectory() as temporary_directory:
         raw_path = os.path.join(temporary_directory, "raw.png")
         result = subprocess.run(
             ["npx", "tsx", "generate.ts", STYLE + content, "--model", MODEL, "--aspect-ratio", aspect_ratio,
              "--quality", "high", "--background", "opaque", "--output", raw_path],
-            cwd=GENERATOR_DIRECTORY, check=True, capture_output=True, text=True,
+            cwd=generator_directory, capture_output=True, text=True,
         )
+        # 실패하면 생성기의 오류 문구(키 없음, 모델 오류 등)를 그대로 보여 준다.
+        if result.returncode != 0:
+            raise RuntimeError(f"{name}: {result.stderr.strip() or result.stdout.strip()}")
         image = Image.open(raw_path).convert("RGB")
     output_path = os.path.join(output_directory, f"{name}.png")
     width, height = save_with_transparent_white(image, output_path)
@@ -74,8 +96,10 @@ def main():
     figures = runpy.run_path(prompts_path)["FIGURES"]
     names = sys.argv[2:] or list(figures)
     output_directory = os.path.dirname(prompts_path)
+    generator_directory = find_generator_directory()
     with ThreadPoolExecutor(max_workers=5) as executor:
-        jobs = [executor.submit(generate, name, *figures[name], output_directory) for name in names]
+        jobs = [executor.submit(generate, name, *figures[name], output_directory, generator_directory)
+                for name in names]
         for job in jobs:
             print(job.result())
 

@@ -47,7 +47,7 @@ Run from the book directory:
 node <skill-dir>/scripts/render.mjs chNN-<slug>.ko.md
 ```
 
-First run only: `cd <skill-dir>/scripts && npm install`. Equation and symbol maps are per book, so a forward reference to an unbuilt chapter needs a second build. A rebuild replaces that chapter's symbol map entries, so after cutting symbols, rebuild the other chapters too. Equation map entries stay, so prose citing a cut equation keeps its hover preview. The build prints a warning when a KaTeX error remains.
+When `<skill-dir>/scripts/node_modules` is missing (first run, or after a plugin update), run `cd <skill-dir>/scripts && npm install` first. Equation and symbol maps are per book, so a forward reference to an unbuilt chapter needs a second build. A rebuild replaces that chapter's symbol map entries, so after cutting symbols, rebuild the other chapters too. Equation map entries stay, so prose citing a cut equation keeps its hover preview. The build prints a warning when a KaTeX error remains.
 
 ## Markdown syntax
 

@@ -15,13 +15,13 @@ Three beats: hold the start state, change one thing, hold the end state.
 
 - Formula and picture move together. The changing term lights up in the accent color and a numeric readout tracks it.
 - Use the book's notation. On-screen labels are in English. No sound.
-- Each scene imports `assets/anim_kit.py`, which holds the palette, axes, beats, and covariance helpers. Start from `assets/anim-template.py`.
+- Each scene imports `assets/anim_kit.py`, which holds the palette, axes, beats, and covariance helpers. Start from `assets/anim-template.py`. Run every `manimgx` command with `PYTHONPATH=<skill-dir>/assets` so the import resolves wherever the skill is installed.
 - Derive every moving object from one `ValueTracker` with `always_redraw`. 3-D positions are `[x, y, 0]`.
 
 Pipeline, in `figures/chNN/`:
 
-1. `manimgx inspect anim-N-M.py <Scene> -t 0.5,5,end` (times in seconds), then Read the storyboard until the layout is clean. A text overlap reported at a caption swap is the fade, not a defect. 3-D scenes get no layout check, so look at every frame.
-2. `manimgx render anim-N-M.py <Scene> -r 1280x720 --fps 30 --crf 28 -o anim-N-M.mp4`. Keep each file under 2 MB.
+1. `PYTHONPATH=<skill-dir>/assets manimgx inspect anim-N-M.py <Scene> -t 0.5,5,end` (times in seconds), then Read the storyboard until the layout is clean. A text overlap reported at a caption swap is the fade, not a defect. 3-D scenes get no layout check, so look at every frame.
+2. `PYTHONPATH=<skill-dir>/assets manimgx render anim-N-M.py <Scene> -r 1280x720 --fps 30 --crf 28 -o anim-N-M.mp4`. Keep each file under 2 MB.
 3. Make the poster from the last frame. ManimGX drops duplicate frames, so index by frame count:
    ```
    N=$(ffprobe -v error -select_streams v:0 -show_entries stream=nb_frames -of csv=p=0 anim-N-M.mp4)
@@ -40,7 +40,7 @@ The page plays a video from the top when it enters the screen and pauses it on l
 
 ## Image model
 
-Put prompts in `figures/chNN/image_prompts.py` as `FIGURES = {"fig-N-M-name": ("16:9", """...""")}`. The runner adds the shared style and removes the white background.
+Put prompts in `figures/chNN/image_prompts.py` as `FIGURES = {"fig-N-M-name": ("16:9", """...""")}`. The runner adds the shared style and removes the white background. It calls the `openrouter-images` skill, found through `OPENROUTER_IMAGES_DIR` or its usual install locations, and needs `OPENROUTER_API_KEY`.
 
 ```
 uv run --no-project -q --with numpy --with pillow python <skill-dir>/scripts/make_images.py figures/chNN/image_prompts.py [name ...]

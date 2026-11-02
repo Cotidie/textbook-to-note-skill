@@ -34,10 +34,8 @@ A chapter request runs all three without stopping and commits after each. `pass 
 /plugin install textbook-notes@textbook-to-note-skill
 ```
 
-Update later with `/plugin marketplace update textbook-to-note-skill`.
-
-`assets/anim-template.py` imports `anim_kit` from `~/.claude/skills/textbook-notes/assets`,
-so animations need route B.
+Update later with `/plugin marketplace update textbook-to-note-skill`. Each update
+lands in a new folder, so the first build after it reinstalls the renderer's npm packages.
 
 ### B. Copy
 
@@ -57,9 +55,15 @@ Restart Claude Code after either route.
 | `poppler-utils` | chapter lookup, figure crops | slower lookup, no cropping |
 | ManimGX, `ffmpeg` | animations | no animations |
 | `uv` | runs the figure scripts with numpy, Pillow, matplotlib | no generated figures or plots |
-| `openrouter-images` skill in `~/.claude/skills/` | image model figures | no image model figures |
+| `openrouter-images` skill, `OPENROUTER_API_KEY` | image model figures | no image model figures |
 
 `sudo apt install poppler-utils` or `brew install poppler`.
+`gh skill install OpenRouterTeam/skills openrouter-images` installs the image skill. The
+runner finds it in the project's or your `.claude/skills/`, or in the plugin cache. Set
+`OPENROUTER_IMAGES_DIR` to its `scripts/` folder when it lives elsewhere.
+
+Animations run as `PYTHONPATH=<skill-dir>/assets manimgx ...`, so they work from either
+install route.
 
 ## Usage
 

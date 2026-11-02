@@ -1,7 +1,7 @@
 {
   "name": "textbook-notes",
   "description": "Turn dense, math-heavy textbook chapter PDFs into study notes read like a newspaper, through three passes (draft, reshape, visuals): server-rendered KaTeX math, ManimGX animations, and generated figures, emitted as one self-contained offline HTML file per chapter.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "skills": "./skills/",
   "author": {
     "name": "Cotidie"
