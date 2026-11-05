@@ -97,7 +97,7 @@ skills/textbook-notes/          # the skill
   SKILL.md
   assets/style.css              # inlined into every note
   assets/template.md            # chapter skeleton
-  assets/anim_kit.py            # palette, axes, beats, covariance helpers
+  assets/anim_kit.py            # palette, axes, stages, covariance helpers
   assets/anim-template.py       # starting point for a scene
   references/pass-*.md          # one contract per pass
   references/reading-rules.md   # writing rules for passes 2 and 3

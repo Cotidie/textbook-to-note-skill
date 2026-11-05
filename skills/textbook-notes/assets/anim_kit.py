@@ -1,4 +1,4 @@
-"""노트 애니메이션 공용 도구: 색, 좌표축, 수식, 세 박자 진행, 공분산 계산."""
+"""노트 애니메이션 공용 도구: 색, 좌표축, 수식, 단계 진행, 공분산 계산."""
 
 import numpy as np
 
@@ -40,7 +40,7 @@ def closed_curve(axes, points, color=ACCENT):
 
 
 class BeatScene(m.Scene):
-    """시작 고정, 변화, 끝 고정으로 진행한다. 설명 문구는 페이드로 바꾼다."""
+    """단계마다 고정, 변화, 고정으로 진행한다. 설명 문구는 페이드로 바꾼다."""
 
     caption = None
 
@@ -59,6 +59,13 @@ class BeatScene(m.Scene):
         self.play(tracker.animate.set_value(value), run_time=run_time, rate_func=rate_func)
         if light is not None:
             self.play(light.animate.set_color(INK), run_time=0.3)
+
+    def stage(self, text, tracker, value, light=None, run_time=4.0, rate_func=m.smooth, hold=1.5):
+        # 한 단계: 자막으로 바뀌는 것을 말하고, 고정, 변화, 고정
+        self.say(text)
+        self.wait(hold)
+        self.change(tracker, value, light=light, run_time=run_time, rate_func=rate_func)
+        self.wait(hold)
 
 
 def eigen_axes(covariance):

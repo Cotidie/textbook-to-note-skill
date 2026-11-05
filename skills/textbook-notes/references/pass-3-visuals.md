@@ -11,17 +11,18 @@ Add the pictures from the handoff's list. A visual must make a specific claim ea
 
 ## Animation (ManimGX)
 
-Three beats: hold the start state, change one thing, hold the end state.
+An animation shows why the mechanism holds. Build it from the handoff's stages, two to four of them, each one a hold, a change, and a hold. When the only motion is one value sweeping to show the result, a static figure carries the same content: draw that, or add the stages that explain it.
 
-- Formula and picture move together. The changing term lights up in the accent color and a numeric readout tracks it.
-- Use the book's notation. On-screen labels are in English. No sound.
-- Each scene imports `assets/anim_kit.py`, which holds the palette, axes, beats, and covariance helpers. Start from `assets/anim-template.py`. Run every `manimgx` command with `PYTHONPATH=<skill-dir>/assets` so the import resolves wherever the skill is installed.
-- Derive every moving object from one `ValueTracker` with `always_redraw`. 3-D positions are `[x, y, 0]`.
+- Each stage changes one thing the viewer can name, and its caption names it. The next stage builds on what the last one left on screen.
+- Formula and picture move together. Each stage lights up the term it changes, and a readout tracks the number that term produces.
+- Use the book's notation. On-screen labels are in English. No sound. A scene runs 20 to 40 seconds.
+- Each scene imports `assets/anim_kit.py`, which holds the palette, axes, `stage`, and covariance helpers. Start from `assets/anim-template.py`. Run every `manimgx` command with `PYTHONPATH=<skill-dir>/assets` so the import resolves wherever the skill is installed.
+- Drive each stage's change with a `ValueTracker` and derive every moving object from the trackers with `always_redraw`. 3-D positions are `[x, y, 0]`.
 
 Pipeline, in `figures/chNN/`:
 
-1. `PYTHONPATH=<skill-dir>/assets manimgx inspect anim-N-M.py <Scene> -t 0.5,5,end` (times in seconds), then Read the storyboard until the layout is clean. A text overlap reported at a caption swap is the fade, not a defect. 3-D scenes get no layout check, so look at every frame.
-2. `PYTHONPATH=<skill-dir>/assets manimgx render anim-N-M.py <Scene> -r 1280x720 --fps 30 --crf 28 -o anim-N-M.mp4`. Keep each file under 2 MB.
+1. `PYTHONPATH=<skill-dir>/assets manimgx inspect anim-N-M.py <Scene> -t <end of each stage>,end` (times in seconds), then Read the storyboard until the layout is clean. A text overlap reported at a caption swap is the fade, not a defect. 3-D scenes get no layout check, so look at every frame.
+2. `PYTHONPATH=<skill-dir>/assets manimgx render anim-N-M.py <Scene> -r 1280x720 --fps 30 --crf 28 -o anim-N-M.mp4`. Keep each file under 3 MB.
 3. Make the poster from the last frame. ManimGX drops duplicate frames, so index by frame count:
    ```
    N=$(ffprobe -v error -select_streams v:0 -show_entries stream=nb_frames -of csv=p=0 anim-N-M.mp4)

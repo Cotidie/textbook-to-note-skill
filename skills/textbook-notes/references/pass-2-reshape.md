@@ -16,7 +16,7 @@ Turn the draft into something read like a newspaper. Work from the draft and the
 4. **Fold into `::: example`:** preconditions, secondary theorems, background from other fields, long proofs, application examples. One worked example per mechanism stays inline, when the body relies on its numbers.
 5. **Rewrite** every remaining passage to `reading-rules.md`.
 6. **Settle the handoff:** resolve each notation conflict and doubt, in the note or by checking the book.
-7. **List visuals in the handoff:** every claim the reader would otherwise have to simulate in their head, with the claim stated in one line. Mark each section's core mechanism.
+7. **List visuals in the handoff:** every claim the reader would otherwise have to simulate in their head, with the claim stated in one line. Mark each section's core mechanism and give it two to four stages that show why it holds. Take them from the draft's derivation, one watchable change each ("slide a flipped copy across: the overlap area is the new density"). A stage list that only restates the result is unfinished.
 
 ## What must survive
 
