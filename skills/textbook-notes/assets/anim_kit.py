@@ -94,3 +94,32 @@ def ellipse_points(covariance, radius=2.0, count=120):
     angle = np.linspace(0, 2 * np.pi, count)
     circle = np.stack([np.cos(angle), np.sin(angle)], axis=1)
     return circle @ np.diag(radius * np.sqrt(eigenvalues)) @ vectors.T
+
+
+def clip_to_square(point, direction, extent):
+    # 직선 point + t·direction 중 [-extent, extent]² 안에 든 구간의 두 끝점. 안 지나가면 None
+    if np.linalg.norm(direction) < 1e-6:
+        return None
+    low, high = -np.inf, np.inf
+    for start, step in zip(point, direction):
+        if abs(step) < 1e-9:
+            if abs(start) > extent:
+                return None
+            continue
+        a, b = (-extent - start) / step, (extent - start) / step
+        low, high = max(low, min(a, b)), min(high, max(a, b))
+    if high - low < 1e-6:
+        return None
+    return point + low * direction, point + high * direction
+
+
+def linear_grid(axes, first_column, second_column, extent=4.0, color=BLUE, opacity=0.35, reach=10):
+    # 열이 first_column, second_column인 2x2 행렬이 옮긴 정수 격자. 평면 밖은 잘라낸다
+    first, second = np.asarray(first_column, float), np.asarray(second_column, float)
+    lines = m.VGroup()
+    for offset, direction in [(first, second), (second, first)]:
+        for index in range(-reach, reach + 1):
+            ends = clip_to_square(index * offset, direction, extent)
+            if ends is not None:
+                lines.add(m.Line(axes.c2p(*ends[0]), axes.c2p(*ends[1]), color=color, stroke_width=1.5, stroke_opacity=opacity))
+    return lines

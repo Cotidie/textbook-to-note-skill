@@ -25,6 +25,7 @@ Short sentence, equation, short sentence, picture.
 - Prefer the 1-D case first when the n-D derivation is the same moves.
 - Use readable numbers. Replace cluttered book examples with the smallest clean instance. No "check by hand" bullets.
 - No `\frac` in inline math. Break wide equations with `aligned`.
+- One relation per line. A sentence holds at most one inline relation. Chains (`a = b = c`), lists of values (`T(1) = 2, T(x) = ...`), and computations go to display math, one step per line in `aligned`, with a short sentence between blocks.
 
 ## Structure
 

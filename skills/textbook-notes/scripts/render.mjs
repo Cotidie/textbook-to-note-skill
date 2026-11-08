@@ -403,10 +403,33 @@ export function katexCss() {
 }
 
 // One animation at a time: start from the top on entering the screen, pause on leaving.
+// The controls sit in a bar under the video, so they never cover the picture or its captions.
 const ANIMATION_SCRIPT = `<script>
+const clock = seconds => Math.floor(seconds / 60) + ':' + String(Math.floor(seconds % 60)).padStart(2, '0')
 for (const video of document.querySelectorAll('figure.anim video')) {
   video.removeAttribute('autoplay')
+  video.removeAttribute('controls')
   video.pause()
+  const bar = document.createElement('div')
+  bar.className = 'anim-bar'
+  bar.innerHTML = '<button type="button" aria-label="play or pause"></button><input type="range" min="0" max="1000" value="0" aria-label="seek"><span></span>'
+  const [button, seek, time] = bar.children
+  video.after(bar)
+  let dragging = false
+  const toggle = () => (video.paused ? video.play().catch(() => {}) : video.pause())
+  const show = () => {
+    button.textContent = video.paused ? '\u25B6' : '\u275A\u275A'
+    const total = video.duration || 0
+    if (total && !dragging) seek.value = Math.round(video.currentTime / total * 1000)
+    time.textContent = clock(video.currentTime) + ' / ' + clock(total)
+  }
+  button.addEventListener('click', toggle)
+  video.addEventListener('click', toggle)
+  seek.addEventListener('pointerdown', () => { dragging = true })
+  seek.addEventListener('change', () => { dragging = false })
+  seek.addEventListener('input', () => { if (video.duration) video.currentTime = seek.value / 1000 * video.duration })
+  for (const name of ['play', 'pause', 'timeupdate', 'loadedmetadata', 'seeked']) video.addEventListener(name, show)
+  show()
   new IntersectionObserver(([entry]) => {
     if (entry.isIntersecting) { video.currentTime = 0; video.play().catch(() => {}) }
     else video.pause()

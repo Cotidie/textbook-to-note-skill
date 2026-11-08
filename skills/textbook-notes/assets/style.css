@@ -69,6 +69,11 @@ details.example[open] > summary { color: var(--ink); margin-bottom: 8px; }
 figure { margin: 24px 0; text-align: center; }
 figure img, p img { max-width: 100%; }
 figure video { max-width: 100%; border: 1px solid var(--hairline); border-radius: 6px; }
+figure.anim video { display: block; width: 100%; cursor: pointer; }
+.anim-bar { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.anim-bar button { width: 28px; padding: 2px 0; border: 1px solid var(--hairline); border-radius: 6px; background: var(--canvas); color: var(--ink); font-size: 12px; cursor: pointer; }
+.anim-bar input[type=range] { flex: 1; accent-color: var(--muted); }
+.anim-bar span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
 
 .fig-row { display: flex; gap: 16px; align-items: flex-end; }
